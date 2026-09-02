@@ -1,0 +1,8 @@
+{
+  "junctions": [
+    { "id": "J1", "name": "Edappally Toll", "lat": 10.0270, "lng": 76.3080, "distanceToNext": 3500 },
+    { "id": "J2", "name": "Palarivattom", "lat": 10.0031, "lng": 76.3105, "distanceToNext": 2000 },
+    { "id": "J3", "name": "Vyttila", "lat": 9.9678, "lng": 76.3218, "distanceToNext": 4000 },
+    { "id": "J4", "name": "Kundanoor", "lat": 9.9324, "lng": 76.3219, "distanceToNext": 0 }
+  ]
+}
