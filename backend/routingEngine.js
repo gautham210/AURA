@@ -267,10 +267,13 @@ class RoutingEngine {
             }
         }
 
+        const physicalTravelTime = totalBaseTime + totalSignalDelay + totalCongestionDelay;
+
         return {
             route: path,
             distance: totalDistance,
-            estimatedTime: dist[destId],
+            estimatedTime: physicalTravelTime,
+            costScore: dist[destId],
             baseTravelTime: totalBaseTime,
             signalDelay: totalSignalDelay,
             congestionDelay: totalCongestionDelay,
@@ -287,7 +290,10 @@ class RoutingEngine {
         let originNodeId = origin;
         let projectedStartGeometry = null;
 
-        if (typeof origin === 'object' && origin.lat && origin.lng) {
+        if (typeof origin === 'string') {
+            const cj = this.graph.controlledJunctions.find(j => j.id === origin);
+            if (cj) originNodeId = cj.osmNodeId;
+        } else if (typeof origin === 'object' && origin.lat && origin.lng) {
             const nearest = this.findNearestEdge(origin.lat, origin.lng);
             if (!nearest.edge || nearest.distMeters > 1000) {
                 return { error: "Please choose a starting location on or near a road." };
@@ -302,7 +308,10 @@ class RoutingEngine {
         let destNodeId = destination;
         let projectedEndGeometry = null;
 
-        if (typeof destination === 'object' && destination.lat && destination.lng) {
+        if (typeof destination === 'string') {
+            const cj = this.graph.controlledJunctions.find(j => j.id === destination);
+            if (cj) destNodeId = cj.osmNodeId;
+        } else if (typeof destination === 'object' && destination.lat && destination.lng) {
             const nearestDest = this.findNearestEdge(destination.lat, destination.lng);
             if (!nearestDest.edge || nearestDest.distMeters > 1000) {
                 return { error: "Please choose a destination on or near a road." };

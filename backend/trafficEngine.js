@@ -1,3 +1,22 @@
+/**
+ * AURA — Adaptive Urban Routing Architecture
+ * Authoritative Traffic Signal Control Engine
+ * 
+ * Conceptual Model:
+ * 4-Approach Junction with Compatible Movement Groups:
+ * - PHASE A (NORTH_SOUTH): Northbound + Southbound compatible through movements
+ * - PHASE B (EAST_WEST): Eastbound + Westbound compatible through movements
+ * 
+ * Dynamic Allocation Principle:
+ * "Don't just optimize the intersection. Control what reaches it."
+ * 
+ * Safety Constraints:
+ * - Conflicting movement groups (NS vs EW) must NEVER simultaneously receive green.
+ * - Clearance lost time and minimum green floors (G_min) are strictly enforced.
+ * - Emergency preemption follows an authoritative state machine:
+ *   NORMAL -> CLEARING -> EMERGENCY_GREEN -> RECOVERY -> NORMAL
+ */
+
 class TrafficEngine {
     constructor(config) {
         this.config = {
@@ -22,23 +41,26 @@ class TrafficEngine {
     }
 
     initJunction(junctionId, phases) {
-        // phases is an array of approaches or array of array of approaches
-        // For simplicity in a 2-phase intersection:
-        // Phase 1: ["NORTHBOUND", "SOUTHBOUND"]
-        // Phase 2: ["EASTBOUND", "WESTBOUND"]
+        // Safe movement groups:
+        // Phase 0 (NORTH_SOUTH): ["NORTHBOUND", "SOUTHBOUND"]
+        // Phase 1 (EAST_WEST):   ["EASTBOUND", "WESTBOUND"]
+        const phaseNames = ["NORTH_SOUTH", "EAST_WEST"];
+
         this.state[junctionId] = {
             phases: phases,
+            phaseNames: phaseNames,
             currentPhaseIndex: 0,
             phaseTimeRemaining: 0,
+            phaseDurations: [30, 30],
             approaches: {},
-            downstreamUtilization: 0, // Mocked or calculated externally if full network
+            downstreamUtilization: 0,
             backPressureMultiplier: 1.0,
             backPressureLevel: 0, 
             spillbackEvents: 0,
             emergency: {
                 active: false,
                 approach: null,
-                state: 'NORMAL',
+                state: 'NORMAL', // NORMAL | CLEARING | EMERGENCY_GREEN | RECOVERY
                 timer: 0
             }
         };
@@ -56,16 +78,30 @@ class TrafficEngine {
             }
         }
         
-        // Initial allocation
+        // Initial allocation and signal states for Phase 0
         this.allocateGreens(junctionId, {});
+        for (let i = 0; i < phases.length; i++) {
+            const isGreen = (i === this.state[junctionId].currentPhaseIndex);
+            for (const app of phases[i]) {
+                this.state[junctionId].approaches[app].signalState = isGreen ? "GREEN" : "RED";
+            }
+        }
     }
 
     calculatePCU(counts) {
+        if (!counts) return 0;
         let pcu = 0;
         pcu += (counts.two_wheeler || 0) * this.config.PCU_WEIGHTS.two_wheeler;
         pcu += (counts.auto_rickshaw || 0) * this.config.PCU_WEIGHTS.auto_rickshaw;
         pcu += (counts.car || 0) * this.config.PCU_WEIGHTS.car;
         pcu += (counts.bus || 0) * this.config.PCU_WEIGHTS.bus;
+        
+        // Check alternate class keys from YOLO model
+        for (const [k, v] of Object.entries(counts)) {
+            if (this.config.PCU_WEIGHTS[k] && !['two_wheeler', 'auto_rickshaw', 'car', 'bus'].includes(k)) {
+                pcu += (v || 0) * this.config.PCU_WEIGHTS[k];
+            }
+        }
         return pcu;
     }
 
@@ -87,6 +123,7 @@ class TrafficEngine {
 
     updateBackPressure(junctionId, downstreamUtilization) {
         const junction = this.state[junctionId];
+        if (!junction) return;
         junction.downstreamUtilization = downstreamUtilization;
         const newLevel = this.getBackPressureLevel(downstreamUtilization);
         
@@ -102,18 +139,28 @@ class TrafficEngine {
         if (!junction) return;
 
         if (approach) {
-            // Activate: CLEARING for 3 ticks, then tick() transitions to EMERGENCY_GREEN
+            // Activate: Enter CLEARING for safety clearance (3 ticks), then transition to EMERGENCY_GREEN
             junction.emergency.active = true;
             junction.emergency.approach = approach;
             junction.emergency.state = 'CLEARING';
             junction.emergency.timer = 3;
+            // Immediate safety clearing: all signals RED
+            for (const phase of junction.phases) {
+                for (const app of phase) {
+                    junction.approaches[app].signalState = "RED";
+                }
+            }
         } else {
-            // Deactivate: RECOVERY for 3 ticks, then tick() transitions to NORMAL
+            // Deactivate: Enter RECOVERY for clearance (2 ticks), then return to NORMAL
             if (junction.emergency.active) {
                 junction.emergency.state = 'RECOVERY';
-                junction.emergency.timer = 3;
+                junction.emergency.timer = 2;
+                for (const phase of junction.phases) {
+                    for (const app of phase) {
+                        junction.approaches[app].signalState = "RED";
+                    }
+                }
             } else {
-                // Already inactive, ensure clean state
                 junction.emergency.active = false;
                 junction.emergency.approach = null;
                 junction.emergency.state = 'NORMAL';
@@ -124,10 +171,10 @@ class TrafficEngine {
 
     allocateGreens(junctionId, demandPCU) {
         const junction = this.state[junctionId];
-        const G_available = this.config.C - this.config.lost_time;
-        const K = junction.phases.length;
-        const G_floor_total = this.config.G_min * K;
-        const G_remaining = Math.max(0, G_available - G_floor_total);
+        const G_available = this.config.C - this.config.lost_time; // 60 - 6 = 54s
+        const K = junction.phases.length; // 2 phases
+        const G_floor_total = this.config.G_min * K; // 10 * 2 = 20s
+        const G_remaining = Math.max(0, G_available - G_floor_total); // 34s
 
         junction.phaseDurations = [];
         let P_total = 0;
@@ -137,7 +184,7 @@ class TrafficEngine {
             let pPhase = 0;
             for (const app of junction.phases[i]) {
                 const pcu = demandPCU[app] || 0;
-                pPhase += pcu * junction.backPressureMultiplier; // Effective demand
+                pPhase += pcu * junction.backPressureMultiplier; // Effective demand with backpressure metering
             }
             phaseDemands.push(pPhase);
             P_total += pPhase;
@@ -146,10 +193,12 @@ class TrafficEngine {
         for (let i = 0; i < K; i++) {
             let G_k;
             if (P_total === 0) {
-                G_k = this.config.G_min + G_remaining * (1 / K);
+                G_k = Math.round(this.config.G_min + G_remaining * (1 / K));
             } else {
-                G_k = this.config.G_min + G_remaining * (phaseDemands[i] / P_total);
+                G_k = Math.round(this.config.G_min + G_remaining * (phaseDemands[i] / P_total));
             }
+            // Enforce minimum floor
+            G_k = Math.max(this.config.G_min, G_k);
             junction.phaseDurations.push(G_k);
         }
         
@@ -158,11 +207,12 @@ class TrafficEngine {
 
     tick(junctionId, arrivals) {
         const junction = this.state[junctionId];
+        if (!junction) return;
         
-        // Gap-out logic
+        // --- 1. Gap-out Evaluation on Active Movement Group ---
         let currentPhaseEmpty = true;
         for (const app of junction.phases[junction.currentPhaseIndex]) {
-            const arr = arrivals[app] || {counts: {two_wheeler:0, auto_rickshaw:0, car:0, bus:0}};
+            const arr = arrivals[app] || { counts: {} };
             const lambda = this.calculatePCU(arr.counts);
             if (junction.approaches[app].q > 0 || lambda > 0) {
                 currentPhaseEmpty = false;
@@ -185,15 +235,21 @@ class TrafficEngine {
             }
         }
 
-        // --- Emergency Override Logic ---
+        // --- 2. Emergency Preemption vs Normal Phase Control ---
         if (junction.emergency.active) {
             if (junction.emergency.state === 'CLEARING') {
                 for (let i = 0; i < junction.phases.length; i++) {
-                    for (const app of junction.phases[i]) junction.approaches[app].signalState = "RED"; // (Could be AMBER conceptually)
+                    for (const app of junction.phases[i]) junction.approaches[app].signalState = "RED";
                 }
                 junction.emergency.timer--;
                 if (junction.emergency.timer <= 0) {
                     junction.emergency.state = 'EMERGENCY_GREEN';
+                    // Authoritative preemption green: priority approach gets GREEN, all conflicting approaches remain RED
+                    for (let i = 0; i < junction.phases.length; i++) {
+                        for (const app of junction.phases[i]) {
+                            junction.approaches[app].signalState = (app === junction.emergency.approach) ? "GREEN" : "RED";
+                        }
+                    }
                 }
             } else if (junction.emergency.state === 'EMERGENCY_GREEN') {
                 for (let i = 0; i < junction.phases.length; i++) {
@@ -209,15 +265,16 @@ class TrafficEngine {
                 if (junction.emergency.timer <= 0) {
                     junction.emergency.active = false;
                     junction.emergency.state = 'NORMAL';
+                    junction.emergency.approach = null;
                 }
             }
         } else {
-            // --- Normal Signal Logic ---
+            // --- Normal AURA Adaptive Signal Phase Cycle ---
             if (gapOutTriggered || junction.phaseTimeRemaining <= 0) {
-                // Next phase
+                // Advance to next compatible movement phase
                 junction.currentPhaseIndex = (junction.currentPhaseIndex + 1) % junction.phases.length;
                 if (junction.currentPhaseIndex === 0) {
-                    // Reallocate greens based on current queue + recent arrivals (mocking actual demand info here)
+                    // Reallocate dynamic greens at start of new cycle based on current approach queues
                     let demandPCU = {};
                     for (let i = 0; i < junction.phases.length; i++) {
                         for (const app of junction.phases[i]) {
@@ -232,20 +289,20 @@ class TrafficEngine {
                 junction.phaseTimeRemaining -= 1;
             }
 
-            // Update signals based on phase
+            // Apply authoritative signal states for active movement phase
             for (let i = 0; i < junction.phases.length; i++) {
-                const isGreen = (i === junction.currentPhaseIndex);
+                const isGreenPhase = (i === junction.currentPhaseIndex);
                 for (const app of junction.phases[i]) {
-                    junction.approaches[app].signalState = isGreen ? "GREEN" : "RED";
+                    junction.approaches[app].signalState = isGreenPhase ? "GREEN" : "RED";
                 }
             }
         }
 
-        // Queue model
+        // --- 3. Queue & Delay Physics Model ---
         for (const phaseApproaches of junction.phases) {
             for (const app of phaseApproaches) {
                 const approachState = junction.approaches[app];
-                const arr = arrivals[app] || {counts: {two_wheeler:0, auto_rickshaw:0, car:0, bus:0}};
+                const arr = arrivals[app] || { counts: {} };
                 const lambda = this.calculatePCU(arr.counts);
                 
                 let mu = 0;
@@ -257,28 +314,54 @@ class TrafficEngine {
                 approachState.max_q = Math.max(approachState.max_q, approachState.q);
                 
                 approachState.totalVehiclesArrived += lambda;
-                approachState.totalAccumulatedDelay += approachState.q * 1; // Delay = queue length (PCU) per second
+                approachState.totalAccumulatedDelay += approachState.q * 1; // Delay = queue length (PCU) * 1s
             }
         }
     }
 
     getJunctionState(junctionId) {
         const junction = this.state[junctionId];
+        if (!junction) return null;
+
+        let activePhaseName = junction.phaseNames[junction.currentPhaseIndex];
+        if (junction.emergency.active) {
+            activePhaseName = junction.emergency.state; // CLEARING, EMERGENCY_GREEN, RECOVERY
+        }
+
+        const phaseDescriptions = {
+            "NORTH_SOUTH": "Northbound + Southbound Through Movements",
+            "EAST_WEST": "Eastbound + Westbound Through Movements",
+            "CLEARING": "Safety Clearance (All Red Buffer)",
+            "EMERGENCY_GREEN": `Emergency Priority (${junction.emergency.approach || 'Corridor'})`,
+            "RECOVERY": "Post-Emergency Recovery Clearance"
+        };
+
         let state = {
+            junction_id: junctionId,
+            phase_name: activePhaseName,
             current_phase: junction.currentPhaseIndex + 1,
-            current_phase_description: junction.phases[junction.currentPhaseIndex].join(" + "),
-            phase_durations: junction.phaseDurations,
+            current_phase_description: phaseDescriptions[activePhaseName] || activePhaseName,
+            phase_durations: {
+                "NORTH_SOUTH": junction.phaseDurations[0] || 30,
+                "EAST_WEST": junction.phaseDurations[1] || 30
+            },
             phase_time_remaining: junction.phaseTimeRemaining,
-            back_pressure_multiplier: junction.backPressureMultiplier,
+            back_pressure_multiplier: +(junction.backPressureMultiplier.toFixed(2)),
             spillback_events: junction.spillbackEvents,
+            emergency: {
+                active: junction.emergency.active,
+                state: junction.emergency.state,
+                approach: junction.emergency.approach
+            },
             approaches: {}
         };
+
         for (const phaseApproaches of junction.phases) {
             for (const app of phaseApproaches) {
                 const aState = junction.approaches[app];
                 const avgDelay = aState.totalVehiclesArrived > 0 ? (aState.totalAccumulatedDelay / aState.totalVehiclesArrived) : 0;
                 state.approaches[app] = {
-                    signal_state: aState.signalState,
+                    signal_state: aState.signalState, // Authoritative RED or GREEN
                     queue_pcu: +(aState.q.toFixed(2)),
                     max_queue_pcu: +(aState.max_q.toFixed(2)),
                     avg_delay_seconds: +(avgDelay.toFixed(1))
@@ -289,6 +372,14 @@ class TrafficEngine {
     }
 }
 
+/**
+ * BaselineController — Offline Counterfactual Reference Model
+ * 
+ * NOTE: This class is strictly a counterfactual baseline for benchmark comparison.
+ * It does NOT control signals, does NOT control vehicles, and does NOT issue commands.
+ * It simulates a fixed 30s/30s un-adaptive pre-timed timer under the IDENTICAL demand stream
+ * to evaluate AURA's delay reduction and spillback prevention.
+ */
 class BaselineController {
     constructor(config) {
         this.config = {
@@ -311,7 +402,13 @@ class BaselineController {
             currentPhaseIndex: 0,
             phaseTimeRemaining: this.config.phase1Duration,
             approaches: {},
-            spillbackEvents: 0
+            spillbackEvents: 0,
+            emergency: {
+                active: false,
+                approach: null,
+                state: 'NORMAL',
+                timer: 0
+            }
         };
 
         for (const phaseApproaches of phases) {
@@ -325,9 +422,17 @@ class BaselineController {
                 };
             }
         }
+
+        for (let i = 0; i < phases.length; i++) {
+            const isGreen = (i === this.state[junctionId].currentPhaseIndex);
+            for (const app of phases[i]) {
+                this.state[junctionId].approaches[app].signalState = isGreen ? "GREEN" : "RED";
+            }
+        }
     }
 
     calculatePCU(counts) {
+        if (!counts) return 0;
         let pcu = 0;
         pcu += (counts.two_wheeler || 0) * this.config.PCU_WEIGHTS.two_wheeler;
         pcu += (counts.auto_rickshaw || 0) * this.config.PCU_WEIGHTS.auto_rickshaw;
@@ -338,8 +443,9 @@ class BaselineController {
 
     tick(junctionId, arrivals) {
         const junction = this.state[junctionId];
-        
-        // Fixed timer logic
+        if (!junction) return;
+
+        // Fixed un-adaptive timer logic (30s / 30s)
         if (junction.phaseTimeRemaining <= 0) {
             junction.currentPhaseIndex = (junction.currentPhaseIndex + 1) % junction.phases.length;
             junction.phaseTimeRemaining = junction.currentPhaseIndex === 0 ? this.config.phase1Duration : this.config.phase2Duration;
@@ -357,7 +463,7 @@ class BaselineController {
         for (const phaseApproaches of junction.phases) {
             for (const app of phaseApproaches) {
                 const approachState = junction.approaches[app];
-                const arr = arrivals[app] || {counts: {two_wheeler:0, auto_rickshaw:0, car:0, bus:0}};
+                const arr = arrivals[app] || { counts: {} };
                 const lambda = this.calculatePCU(arr.counts);
                 
                 let mu = 0;
@@ -374,50 +480,30 @@ class BaselineController {
         }
     }
 
-    getJunctionState(junctionId) {
+    getCounterfactualState(junctionId) {
         const junction = this.state[junctionId];
-        let state = {
-            current_phase: junction.currentPhaseIndex + 1,
-            current_phase_description: junction.phases[junction.currentPhaseIndex].join(" + "),
-            phase_time_remaining: junction.phaseTimeRemaining,
-            spillback_events: junction.spillbackEvents,
-            approaches: {}
-        };
+        if (!junction) return null;
+
+        let totalDelay = 0;
+        let totalArrived = 0;
+        let maxQueue = 0;
+
         for (const phaseApproaches of junction.phases) {
             for (const app of phaseApproaches) {
-                const aState = junction.approaches[app];
-                const avgDelay = aState.totalVehiclesArrived > 0 ? (aState.totalAccumulatedDelay / aState.totalVehiclesArrived) : 0;
-                state.approaches[app] = {
-                    signal_state: aState.signalState,
-                    queue_pcu: +(aState.q.toFixed(2)),
-                    max_queue_pcu: +(aState.max_q.toFixed(2)),
-                    avg_delay_seconds: +(avgDelay.toFixed(1))
-                };
+                const a = junction.approaches[app];
+                totalDelay += a.totalAccumulatedDelay;
+                totalArrived += a.totalVehiclesArrived;
+                if (a.q > maxQueue) maxQueue = a.q;
             }
         }
-        return state;
-    }
 
-    setEmergencyPreemption(junctionId, approach) {
-        if (!this.state[junctionId]) return;
-        const junction = this.state[junctionId];
-        
-        if (approach) {
-            if (junction.emergency.approach !== approach) {
-                junction.emergency.active = true;
-                junction.emergency.approach = approach;
-                if (junction.emergency.state === 'NORMAL' || junction.emergency.state === 'RECOVERY') {
-                    junction.emergency.state = 'CLEARING';
-                    junction.emergency.timer = 3;
-                }
-            }
-        } else {
-            if (junction.emergency.active) {
-                junction.emergency.state = 'RECOVERY';
-                junction.emergency.timer = 2;
-                junction.emergency.approach = null;
-            }
-        }
+        const avgDelay = totalArrived > 0 ? (totalDelay / totalArrived) : 0;
+        return {
+            reference_model: "FIXED_30_30",
+            avg_delay_seconds: +(avgDelay.toFixed(1)),
+            max_queue_pcu: +(maxQueue.toFixed(1)),
+            total_delay_seconds: +(totalDelay.toFixed(1))
+        };
     }
 }
 

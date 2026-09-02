@@ -10,8 +10,9 @@ class SimulationSensor {
         junctionIds.forEach(jid => {
             if (!this.state[jid]) this.state[jid] = {};
             approaches.forEach(appr => {
-                const isCar = this.rng() > 0.5;
-                const isTwoWheeler = this.rng() > 0.7;
+                const r = this.rng();
+                const isCar = r < 0.10;
+                const isTwoWheeler = r > 0.90;
                 
                 let counts = { two_wheeler: 0, auto_rickshaw: 0, car: 0, bus: 0 };
                 if (isCar) counts.car = 1;

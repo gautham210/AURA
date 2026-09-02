@@ -11,18 +11,17 @@ class AuraStateStore {
         this.userOriginLng = null;
         this.userDest = null; // Can be nodeId string or {lat, lng}
         this.emergencyActive = false;
-        this.emergencyPreemptions = {}; // { 'J1': 'EMERGENCY_GREEN' }
+        this.currentEmergencyHospital = null;
     }
 
     updateGraph(graphData) {
         this.graph = graphData;
         initMap(this.graph);
         populateRoutingSelects(this.graph);
-        
     }
 
     updateTrafficState(stateData) {
-        this.networkState = stateData.junctions;
+        this.networkState = stateData.junctions || [];
         this.greenWave = stateData.green_wave || {};
         
         updateTopMetrics(this.networkState);
@@ -44,8 +43,10 @@ let isMapDestSelectionMode = false;
 let userOriginMarker = null;
 let userDestMarker = null;
 let emergencyMarker = null;
+let emergencyPolyline = null;
+let emergencyGlowPolyline = null;
 
-// DOM Elements
+// Safe DOM Elements
 const tabControlRoom = document.getElementById('tab-control-room');
 const tabUserView = document.getElementById('tab-user-view');
 const drawerControl = document.getElementById('drawer-control');
@@ -57,55 +58,63 @@ const dataSourceLabel = document.getElementById('data-source');
 const connectionStatus = document.getElementById('connection-status');
 const crInsightsPanel = document.getElementById('cr-insights-panel');
 
+const btnSimulateEmergency = document.getElementById('btn-simulate-emergency');
+const btnDemoStart = document.getElementById('btn-demo-start');
+const btnDemoPause = document.getElementById('btn-demo-pause');
+const btnDemoReset = document.getElementById('btn-demo-reset');
+
 // Setup Navigation Tabs
-tabControlRoom.addEventListener('click', () => switchMode('CONTROL_ROOM'));
-tabUserView.addEventListener('click', () => switchMode('USER_VIEW'));
-btnCloseDrawer.addEventListener('click', () => {
-    drawerControl.classList.add('translate-x-full');
-    store.selectedJunctionId = null;
-    highlightMarker(null);
-});
+if (tabControlRoom) tabControlRoom.addEventListener('click', () => switchMode('CONTROL_ROOM'));
+if (tabUserView) tabUserView.addEventListener('click', () => switchMode('USER_VIEW'));
+if (btnCloseDrawer) {
+    btnCloseDrawer.addEventListener('click', () => {
+        if (drawerControl) drawerControl.classList.add('translate-x-full');
+        store.selectedJunctionId = null;
+        highlightMarker(null);
+    });
+}
 
 function switchMode(mode) {
     store.currentMode = mode;
     
     if (mode === 'CONTROL_ROOM') {
-        tabControlRoom.className = "text-xs font-bold px-3 py-1.5 rounded-md border border-[#3B82F6] bg-[#1E3A8A]/30 text-[#60A5FA] transition-all flex items-center gap-1.5 shadow-sm";
-        tabUserView.className = "text-xs font-semibold px-3 py-1.5 rounded-md border border-transparent text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-all flex items-center gap-1.5";
+        if (tabControlRoom) tabControlRoom.className = "text-xs font-bold px-3 py-1.5 rounded-md border border-[#3B82F6] bg-[#1E3A8A]/30 text-[#60A5FA] transition-all flex items-center gap-1.5 shadow-sm";
+        if (tabUserView) tabUserView.className = "text-xs font-semibold px-3 py-1.5 rounded-md border border-transparent text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-all flex items-center gap-1.5";
         
-        panelUserView.classList.add('hidden');
-        crInsightsPanel.classList.remove('hidden');
-        document.getElementById('top-metrics').classList.remove('hidden');
-        
+        if (panelUserView) panelUserView.classList.add('hidden');
+        if (crInsightsPanel) crInsightsPanel.classList.remove('hidden');
+        const topMetrics = document.getElementById('top-metrics');
+        if (topMetrics) topMetrics.classList.remove('hidden');
         
         // Show Control Room Layers
-        if (corridorLayer && !map.hasLayer(corridorLayer)) map.addLayer(corridorLayer);
-        if (poiLayer && !map.hasLayer(poiLayer)) map.addLayer(poiLayer);
-        if (markerLayer && !map.hasLayer(markerLayer)) map.addLayer(markerLayer);
+        if (corridorLayer && map && !map.hasLayer(corridorLayer)) map.addLayer(corridorLayer);
+        if (poiLayer && map && !map.hasLayer(poiLayer)) map.addLayer(poiLayer);
+        if (markerLayer && map && !map.hasLayer(markerLayer)) map.addLayer(markerLayer);
         
         // Clean User View Markers
-        if (userOriginMarker && map.hasLayer(userOriginMarker)) map.removeLayer(userOriginMarker);
-        if (userDestMarker && map.hasLayer(userDestMarker)) map.removeLayer(userDestMarker);
+        if (userOriginMarker && map && map.hasLayer(userOriginMarker)) map.removeLayer(userOriginMarker);
+        if (userDestMarker && map && map.hasLayer(userDestMarker)) map.removeLayer(userDestMarker);
         if (routingLayer) routingLayer.clearLayers();
         
-        if (store.selectedJunctionId) {
+        if (store.selectedJunctionId && drawerControl) {
             drawerControl.classList.remove('translate-x-full');
         }
     } else {
-        tabControlRoom.className = "text-xs font-semibold px-3 py-1.5 rounded-md border border-transparent text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-all flex items-center gap-1.5";
-        tabUserView.className = "text-xs font-bold px-3 py-1.5 rounded-md border border-[#3B82F6] bg-[#1E3A8A]/30 text-[#60A5FA] transition-all flex items-center gap-1.5 shadow-sm";
+        if (tabControlRoom) tabControlRoom.className = "text-xs font-semibold px-3 py-1.5 rounded-md border border-transparent text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-all flex items-center gap-1.5";
+        if (tabUserView) tabUserView.className = "text-xs font-bold px-3 py-1.5 rounded-md border border-[#3B82F6] bg-[#1E3A8A]/30 text-[#60A5FA] transition-all flex items-center gap-1.5 shadow-sm";
         
-        panelUserView.classList.remove('hidden');
-        crInsightsPanel.classList.add('hidden');
-        document.getElementById('top-metrics').classList.add('hidden');
+        if (panelUserView) panelUserView.classList.remove('hidden');
+        if (crInsightsPanel) crInsightsPanel.classList.add('hidden');
+        const topMetrics = document.getElementById('top-metrics');
+        if (topMetrics) topMetrics.classList.add('hidden');
         
-        drawerControl.classList.add('translate-x-full');
+        if (drawerControl) drawerControl.classList.add('translate-x-full');
         highlightMarker(null);
         
         // Hide technical Control Room layers for clean driver UX
-        if (corridorLayer && map.hasLayer(corridorLayer)) map.removeLayer(corridorLayer);
-        if (poiLayer && map.hasLayer(poiLayer)) map.removeLayer(poiLayer);
-        if (markerLayer && map.hasLayer(markerLayer)) map.removeLayer(markerLayer);
+        if (corridorLayer && map && map.hasLayer(corridorLayer)) map.removeLayer(corridorLayer);
+        if (poiLayer && map && map.hasLayer(poiLayer)) map.removeLayer(poiLayer);
+        if (markerLayer && map && map.hasLayer(markerLayer)) map.removeLayer(markerLayer);
         if (emergencyLayer) emergencyLayer.clearLayers();
     }
     
@@ -149,24 +158,33 @@ function initMap(graphData) {
         }
     });
 
-    // 1. Draw AURA Corridors (Real OSM Geometry)
-    graphData.edges.forEach(edge => {
-        if (edge.is_aura_corridor && edge.geometry && edge.geometry.length > 0) {
-            L.polyline(edge.geometry, {
-                color: '#3B82F6',
-                weight: 3.5,
-                opacity: 0.75,
-                lineCap: 'round',
-                lineJoin: 'round'
-            }).addTo(corridorLayer);
-        }
-    });
+    // 1. Draw AURA Corridors (Real OSM Road Geometry)
+    if (graphData && graphData.edges) {
+        graphData.edges.forEach(edge => {
+            if (edge.is_aura_corridor && edge.geometry && edge.geometry.length > 0) {
+                L.polyline(edge.geometry, {
+                    color: '#3B82F6',
+                    weight: 3.5,
+                    opacity: 0.75,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                }).addTo(corridorLayer);
+            }
+        });
+    }
 
-    // 2. Draw Curated ~10 Major Hospitals (Control Room Only)
-    drawHospitalPOIs(graphData.pois);
+    // 2. Draw Curated 10 Major Hospitals (Control Room Only)
+    if (graphData && graphData.pois) {
+        drawHospitalPOIs(graphData.pois);
+    }
 
     // 3. Draw Six Controlled Junctions (J1 to J6)
-    drawControlledJunctions(graphData.controlledJunctions);
+    if (graphData && graphData.controlledJunctions) {
+        drawControlledJunctions(graphData.controlledJunctions);
+    }
+
+    // 4. Initialize Authoritative Traffic Visualizer Canvas
+    initTrafficVisualization();
 }
 
 // -------------------------------------------------------------
@@ -175,7 +193,6 @@ function initMap(graphData) {
 function drawHospitalPOIs(pois) {
     if (!pois) return;
     
-    // Strict filter: only genuine hospitals
     const hospitals = pois.filter(p => (p.type === 'hospital' || p.type === 'clinic') && /hospital/i.test(p.name));
     
     const badge = document.getElementById('poi-summary-badge');
@@ -291,59 +308,58 @@ function initTrafficVisualization() {
 
 function renderTrafficVis() {
     if (!canvas || !ctx || !map || store.currentMode !== 'CONTROL_ROOM') {
-        if(canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
         requestAnimationFrame(renderTrafficVis);
         return;
     }
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    store.networkState.forEach(jState => {
-        const dirs = ["NORTHBOUND", "SOUTHBOUND", "EASTBOUND", "WESTBOUND"];
-        dirs.forEach(dir => {
-            const app = jState.aura.approaches[dir];
-            if (!app) return;
-            
-            // Find edge geometry
-            const edge = store.graph.edges.find(e => (e.to === jState.junction_id || e.to === store.graph.controlledJunctions.find(j=>j.id===jState.junction_id)?.osmNodeId) && e.approachAtTarget === dir && e.geometry);
-            if (!edge) return;
-            
-            const geom = edge.geometry;
-            if (geom.length < 2) return;
-            
-            // We draw vehicles based on queue_pcu
-            const pcu = Math.min(app.queue_pcu || 0, 50); // cap at 50 for visual sanity
-            if (pcu <= 0) return;
-            
-            const numVehicles = Math.ceil(pcu);
-            const isGreen = app.signal_state === "GREEN";
-            
-            ctx.fillStyle = isGreen ? "rgba(16, 185, 129, 0.8)" : "rgba(239, 68, 68, 0.8)"; // Green or Red vehicles
-            
-            // Start from junction (end of edge) and work backwards
-            let geomIdx = geom.length - 1;
-            let currentPt = geom[geomIdx];
-            let prevPt = geom[geomIdx - 1];
-            
-            for(let i=0; i<numVehicles; i++) {
-                // Approximate mapping: each vehicle takes up space backwards along the segment
-                const offsetProgress = Math.max(0, 1.0 - ((i+1) * 0.02)); 
-                // Project onto screen
-                const p1Pos = map.latLngToContainerPoint([prevPt[0], prevPt[1]]);
-                const p2Pos = map.latLngToContainerPoint([currentPt[0], currentPt[1]]);
+    if (store.networkState && store.graph) {
+        store.networkState.forEach(jState => {
+            const dirs = ["NORTHBOUND", "SOUTHBOUND", "EASTBOUND", "WESTBOUND"];
+            dirs.forEach(dir => {
+                const app = jState.aura && jState.aura.approaches ? jState.aura.approaches[dir] : null;
+                if (!app) return;
                 
-                const vx = p2Pos.x - p1Pos.x;
-                const vy = p2Pos.y - p1Pos.y;
+                const cj = store.graph.controlledJunctions ? store.graph.controlledJunctions.find(j => j.id === jState.junction_id) : null;
+                const targetNodeId = cj ? cj.osmNodeId : jState.junction_id;
                 
-                const px = p1Pos.x + vx * offsetProgress;
-                const py = p1Pos.y + vy * offsetProgress;
+                // Find approaching edge geometry
+                const edge = store.graph.edges.find(e => (e.to === jState.junction_id || e.to === targetNodeId) && e.approachAtTarget === dir && e.geometry);
+                if (!edge || !edge.geometry || edge.geometry.length < 2) return;
                 
-                ctx.beginPath();
-                ctx.arc(px, py, 1.5, 0, 2 * Math.PI);
-                ctx.fill();
-            }
+                const geom = edge.geometry;
+                const pcu = Math.min(app.queue_pcu || 0, 40);
+                if (pcu <= 0) return;
+                
+                const numVehicles = Math.ceil(pcu);
+                const isGreen = app.signal_state === "GREEN";
+                
+                ctx.fillStyle = isGreen ? "rgba(16, 185, 129, 0.85)" : "rgba(239, 68, 68, 0.85)";
+                
+                let geomIdx = geom.length - 1;
+                let currentPt = geom[geomIdx];
+                let prevPt = geom[geomIdx - 1];
+                
+                for (let i = 0; i < numVehicles; i++) {
+                    const offsetProgress = Math.max(0, 1.0 - ((i + 1) * 0.035));
+                    const p1Pos = map.latLngToContainerPoint([prevPt[0], prevPt[1]]);
+                    const p2Pos = map.latLngToContainerPoint([currentPt[0], currentPt[1]]);
+                    
+                    const vx = p2Pos.x - p1Pos.x;
+                    const vy = p2Pos.y - p1Pos.y;
+                    
+                    const px = p1Pos.x + vx * offsetProgress;
+                    const py = p1Pos.y + vy * offsetProgress;
+                    
+                    ctx.beginPath();
+                    ctx.arc(px, py, 2.0, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            });
         });
-    });
+    }
     
     requestAnimationFrame(renderTrafficVis);
 }
@@ -352,9 +368,11 @@ function renderTrafficVis() {
 // Real-time Marker & Signal Updates
 // -------------------------------------------------------------
 function updateMapMarkers(networkState) {
+    if (!networkState) return;
+    
     networkState.forEach(j => {
         const jm = junctionMarkers[j.junction_id];
-        if (!jm) return;
+        if (!jm || !j.aura) return;
 
         const haloEl = document.getElementById(jm.haloId);
         const pipEl = document.getElementById(jm.pipId);
@@ -362,18 +380,22 @@ function updateMapMarkers(networkState) {
         let maxQ = 0;
         let isGreen = false;
 
-        Object.values(j.aura.approaches).forEach(app => {
-            if (app.queue_pcu > maxQ) maxQ = app.queue_pcu;
-            if (app.signal_state === "GREEN") isGreen = true;
-        });
+        if (j.aura.approaches) {
+            Object.values(j.aura.approaches).forEach(app => {
+                if (app.queue_pcu > maxQ) maxQ = app.queue_pcu;
+                if (app.signal_state === "GREEN") isGreen = true;
+            });
+        }
+
+        const isEmergency = j.aura.emergency && j.aura.emergency.active;
 
         // Update Halo
         if (haloEl) {
-            if (store.emergencyPreemptions[j.junction_id]) {
+            if (isEmergency) {
                 haloEl.className = "absolute -inset-1.5 rounded-full border-2 border-[#3B82F6] shadow-[0_0_16px_#3B82F6] opacity-100 animate-pulse";
-            } else if (maxQ > 25) {
+            } else if (maxQ > 15) {
                 haloEl.className = "absolute -inset-1.5 rounded-full border-2 border-[#EF4444] shadow-[0_0_12px_rgba(239,68,68,0.8)] opacity-90 animate-pulse";
-            } else if (maxQ > 10) {
+            } else if (maxQ > 6) {
                 haloEl.className = "absolute -inset-1.5 rounded-full border-2 border-[#F59E0B] shadow-[0_0_8px_rgba(245,158,11,0.5)] opacity-80";
             } else {
                 haloEl.className = "absolute -inset-1.5 rounded-full border-2 border-[#10B981] opacity-70";
@@ -382,7 +404,9 @@ function updateMapMarkers(networkState) {
 
         // Update Pip
         if (pipEl) {
-            if (isGreen) {
+            if (isEmergency) {
+                pipEl.className = "absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#3B82F6] border-2 border-[#0d1117] shadow-[0_0_8px_#3B82F6] animate-ping";
+            } else if (isGreen) {
                 pipEl.className = "absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#10B981] border-2 border-[#0d1117] shadow-[0_0_6px_#10B981]";
             } else {
                 pipEl.className = "absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#EF4444] border-2 border-[#0d1117]";
@@ -403,24 +427,31 @@ function updateTopMetrics(networkState) {
     let totalSpillbacks = 0;
 
     networkState.forEach(j => {
+        if (!j.aura) return;
         totalSpillbacks += j.aura.spillback_events || 0;
         
-        Object.values(j.aura.approaches).forEach(app => {
-            if (app.avg_delay_seconds > 0) {
-                totalDelay += app.avg_delay_seconds;
-                delayCount++;
-            }
-            if (app.queue_pcu > maxDemand) {
-                maxDemand = app.queue_pcu;
-            }
-        });
+        if (j.aura.approaches) {
+            Object.values(j.aura.approaches).forEach(app => {
+                if (app.avg_delay_seconds > 0) {
+                    totalDelay += app.avg_delay_seconds;
+                    delayCount++;
+                }
+                if (app.queue_pcu > maxDemand) {
+                    maxDemand = app.queue_pcu;
+                }
+            });
+        }
     });
 
     const avgDelay = delayCount > 0 ? (totalDelay / delayCount).toFixed(1) : "0.0";
     
-    document.getElementById('metric-delay').textContent = `${avgDelay}s`;
-    document.getElementById('metric-demand').textContent = `${maxDemand.toFixed(1)} PCU`;
-    document.getElementById('metric-spillbacks').textContent = totalSpillbacks;
+    const metricDelay = document.getElementById('metric-delay');
+    const metricDemand = document.getElementById('metric-demand');
+    const metricSpillbacks = document.getElementById('metric-spillbacks');
+
+    if (metricDelay) metricDelay.textContent = `${avgDelay}s`;
+    if (metricDemand) metricDemand.textContent = `${maxDemand.toFixed(1)} PCU`;
+    if (metricSpillbacks) metricSpillbacks.textContent = totalSpillbacks;
 }
 
 // -------------------------------------------------------------
@@ -430,11 +461,13 @@ function selectJunction(id) {
     store.selectedJunctionId = id;
     highlightMarker(id);
     renderJunctionDetail(id);
-    drawerControl.classList.remove('translate-x-full');
+    if (drawerControl) drawerControl.classList.remove('translate-x-full');
     
-    const jData = store.graph.controlledJunctions.find(j => j.id === id);
-    if (jData) {
-        map.panTo([jData.lat, jData.lng]);
+    if (store.graph && store.graph.controlledJunctions) {
+        const jData = store.graph.controlledJunctions.find(j => j.id === id);
+        if (jData && map) {
+            map.panTo([jData.lat, jData.lng]);
+        }
     }
 }
 
@@ -455,26 +488,48 @@ function highlightMarker(selectedId) {
 }
 
 function renderJunctionDetail(id) {
-    const jNode = store.graph.controlledJunctions.find(j => j.id === id);
+    if (!store.graph || !store.networkState) return;
+    const jNode = store.graph.controlledJunctions ? store.graph.controlledJunctions.find(j => j.id === id) : null;
     const jState = store.networkState.find(s => s.junction_id === id);
-    if (!jNode || !jState) return;
+    if (!jNode || !jState || !jState.aura) return;
 
-    document.getElementById('drawer-jid').textContent = id;
-    document.getElementById('drawer-title').textContent = jNode.name;
-    document.getElementById('drawer-phase').textContent = `PHASE ${jState.current_phase || jState.aura.current_phase}`;
+    const jidEl = document.getElementById('drawer-jid');
+    const titleEl = document.getElementById('drawer-title');
+    const phaseEl = document.getElementById('drawer-phase');
+    const phaseDescEl = document.getElementById('drawer-phase-desc');
+    const centerSigId = document.getElementById('center-sig-id');
+
+    if (jidEl) jidEl.textContent = id;
+    if (titleEl) titleEl.textContent = jNode.name;
     
-    const activeMovements = jState.aura.current_phase_description || "--";
-    document.getElementById('drawer-phase-desc').textContent = `ACTIVE MOVEMENTS: ${activeMovements}`;
+    const isEm = jState.aura.emergency && jState.aura.emergency.active;
+    if (phaseEl) {
+        if (isEm) {
+            phaseEl.textContent = `EMERGENCY: ${jState.aura.emergency.state}`;
+            phaseEl.className = "px-2 py-0.5 bg-[#EF4444]/20 text-[#EF4444] font-bold rounded border border-[#EF4444]/40 animate-pulse";
+        } else {
+            phaseEl.textContent = `PHASE ${jState.aura.current_phase || jState.current_phase || 1}`;
+            phaseEl.className = "px-2 py-0.5 bg-[#3B82F6]/20 text-[#60A5FA] font-bold rounded border border-[#3B82F6]/30";
+        }
+    }
+    
+    if (phaseDescEl) {
+        if (isEm) {
+            phaseDescEl.textContent = `PRIORITY CORRIDOR: ${jState.aura.emergency.approach || 'CLEARING'}`;
+        } else {
+            phaseDescEl.textContent = `ACTIVE MOVEMENTS: ${jState.aura.current_phase_description || '--'}`;
+        }
+    }
 
-    document.getElementById('center-sig-id').textContent = id;
+    if (centerSigId) centerSigId.textContent = id;
     const dirs = ["NORTHBOUND", "SOUTHBOUND", "EASTBOUND", "WESTBOUND"];
     
     dirs.forEach(dir => {
         const el = document.getElementById(`sig-${dir}`);
-        if (el) {
+        if (el && jState.aura.approaches) {
             const appState = jState.aura.approaches[dir];
             if (appState) {
-                if (store.emergencyPreemptions[id] === dir) {
+                if (isEm && jState.aura.emergency.approach === dir && jState.aura.emergency.state === 'EMERGENCY_GREEN') {
                     el.className = "w-5 h-5 rounded-full border border-[#30363d] signal-emergency";
                 } else if (appState.signal_state === "GREEN") {
                     el.className = "w-5 h-5 rounded-full border border-[#30363d] signal-green";
@@ -488,83 +543,124 @@ function renderJunctionDetail(id) {
     });
 
     const approachesContainer = document.getElementById('drawer-approaches');
-    approachesContainer.innerHTML = '';
-    
-    dirs.forEach(dir => {
-        const appState = jState.aura.approaches[dir];
-        if (appState) {
-            const isGreen = appState.signal_state === "GREEN";
-            const sigBadge = isGreen ? "bg-[#10B981]/20 text-[#10B981] border-[#10B981]/40" : "bg-[#EF4444]/20 text-[#EF4444] border-[#EF4444]/40";
-            const modeBadge = appState.source_mode === "LIVE" ? "text-[#10B981]" : (appState.source_mode === "REPLAY" ? "text-[#F59E0B]" : "text-[#8b949e]");
+    if (approachesContainer && jState.aura.approaches) {
+        approachesContainer.innerHTML = '';
+        
+        dirs.forEach(dir => {
+            const appState = jState.aura.approaches[dir];
+            if (appState) {
+                const isGreen = appState.signal_state === "GREEN";
+                const sigBadge = isGreen ? "bg-[#10B981]/20 text-[#10B981] border-[#10B981]/40" : "bg-[#EF4444]/20 text-[#EF4444] border-[#EF4444]/40";
+                const modeBadge = appState.source_mode === "LIVE" ? "text-[#10B981]" : (appState.source_mode === "REPLAY" ? "text-[#F59E0B]" : "text-[#8b949e]");
 
-            const html = `
-                <div class="bg-[#0d1117] border border-[#30363d] rounded-md p-2.5 flex justify-between items-center shadow-sm">
-                    <div class="flex items-center gap-2.5">
-                        <span class="text-[10px] font-mono font-bold text-[#8b949e] w-14">${dir.substring(0,5)}</span>
-                        <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded border ${sigBadge}">${appState.signal_state}</span>
-                        <span class="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#161b22] border border-[#30363d] ${modeBadge}">${appState.source_mode || 'SIM'}</span>
-                    </div>
-                    <div class="flex items-center gap-4 font-mono text-xs">
-                        <div class="flex flex-col items-end">
-                            <span class="text-[#8b949e] text-[8px] uppercase">Queue</span>
-                            <span class="text-white font-semibold">${appState.queue_pcu.toFixed(1)} <span class="text-[9px] text-[#8b949e]">PCU</span></span>
+                const html = `
+                    <div class="bg-[#0d1117] border border-[#30363d] rounded-md p-2.5 flex justify-between items-center shadow-sm">
+                        <div class="flex items-center gap-2.5">
+                            <span class="text-[10px] font-mono font-bold text-[#8b949e] w-14">${dir.substring(0,5)}</span>
+                            <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded border ${sigBadge}">${appState.signal_state}</span>
+                            <span class="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#161b22] border border-[#30363d] ${modeBadge}">${appState.source_mode || 'SIM'}</span>
                         </div>
-                        <div class="flex flex-col items-end">
-                            <span class="text-[#8b949e] text-[8px] uppercase">Delay</span>
-                            <span class="text-white font-semibold">${appState.avg_delay_seconds.toFixed(1)}s</span>
+                        <div class="flex items-center gap-4 font-mono text-xs">
+                            <div class="flex flex-col items-end">
+                                <span class="text-[#8b949e] text-[8px] uppercase">Queue</span>
+                                <span class="text-white font-semibold">${(appState.queue_pcu || 0).toFixed(1)} <span class="text-[9px] text-[#8b949e]">PCU</span></span>
+                            </div>
+                            <div class="flex flex-col items-end">
+                                <span class="text-[#8b949e] text-[8px] uppercase">Delay</span>
+                                <span class="text-white font-semibold">${(appState.avg_delay_seconds || 0).toFixed(1)}s</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
-            approachesContainer.insertAdjacentHTML('beforeend', html);
-        }
-    });
+                `;
+                approachesContainer.insertAdjacentHTML('beforeend', html);
+            }
+        });
+    }
 
     const bp = jState.aura.back_pressure_multiplier || 1.0;
     const bpElem = document.getElementById('drawer-backpressure');
-    if (bp < 0.8) {
-        bpElem.textContent = `HIGH CONGESTION (BP: ${bp.toFixed(2)})`;
-        bpElem.className = "font-mono text-[#EF4444] font-bold bg-[#EF4444]/10 px-2 py-0.5 rounded border border-[#EF4444]/30";
-    } else {
-        bpElem.textContent = "NOMINAL CAPACITY (BP: 1.00)";
-        bpElem.className = "font-mono text-[#10B981] font-bold bg-[#10B981]/10 px-2 py-0.5 rounded border border-[#10B981]/30";
+    if (bpElem) {
+        if (bp < 0.8) {
+            bpElem.textContent = `HIGH CONGESTION (BP: ${bp.toFixed(2)})`;
+            bpElem.className = "font-mono text-[#EF4444] font-bold bg-[#EF4444]/10 px-2 py-0.5 rounded border border-[#EF4444]/30";
+        } else {
+            bpElem.textContent = "NOMINAL CAPACITY (BP: 1.00)";
+            bpElem.className = "font-mono text-[#10B981] font-bold bg-[#10B981]/10 px-2 py-0.5 rounded border border-[#10B981]/30";
+        }
     }
 
-    document.getElementById('drawer-explanation').textContent = generateAuraExplanation(jState);
+    const expElem = document.getElementById('drawer-explanation');
+    if (expElem) expElem.textContent = generateAuraExplanation(jState);
 
     let primarySource = "SIMULATED";
     let totalPcu = 0;
-    dirs.forEach(dir => {
-        if (jState.aura.approaches[dir]) {
-            if (jState.aura.approaches[dir].source_mode === "LIVE") primarySource = "LIVE";
-            else if (jState.aura.approaches[dir].source_mode === "REPLAY" && primarySource !== "LIVE") primarySource = "REPLAY";
-            totalPcu += jState.aura.approaches[dir].queue_pcu;
-        }
-    });
+    if (jState.aura.approaches) {
+        dirs.forEach(dir => {
+            const a = jState.aura.approaches[dir];
+            if (a) {
+                if (a.source_mode === "LIVE") primarySource = "LIVE";
+                else if (a.source_mode === "REPLAY" && primarySource !== "LIVE") primarySource = "REPLAY";
+                totalPcu += (a.queue_pcu || 0);
+            }
+        });
+    }
 
-    document.getElementById('ev-source').textContent = primarySource;
-    document.getElementById('ev-pcu').textContent = `${totalPcu.toFixed(1)} PCU`;
-    document.getElementById('ev-timestamp').textContent = new Date().toLocaleTimeString();
+    const evSource = document.getElementById('ev-source');
+    const evPcu = document.getElementById('ev-pcu');
+    const evTimestamp = document.getElementById('ev-timestamp');
+
+    if (evSource) evSource.textContent = primarySource;
+    if (evPcu) evPcu.textContent = `${totalPcu.toFixed(1)} PCU`;
+    if (evTimestamp) evTimestamp.textContent = new Date().toLocaleTimeString();
+
+    // Counterfactual Baseline Benchmark (Offline Reference Comparison Only)
+    const cf = jState.counterfactual || (jState.aura && jState.aura.counterfactual);
+    const cfDelayEl = document.getElementById('cf-baseline-delay');
+    const cfSavingsEl = document.getElementById('cf-aura-savings');
+    if (cfDelayEl && cf) {
+        cfDelayEl.textContent = `${cf.avg_delay_seconds || 0}s`;
+        
+        let auraDelay = 0;
+        let count = 0;
+        if (jState.aura.approaches) {
+            Object.values(jState.aura.approaches).forEach(a => {
+                if (a.avg_delay_seconds > 0) {
+                    auraDelay += a.avg_delay_seconds;
+                    count++;
+                }
+            });
+        }
+        const avgAura = count > 0 ? (auraDelay / count) : 0;
+        const baseDelay = cf.avg_delay_seconds || 1;
+        const savings = Math.max(0, Math.min(95, Math.round(((baseDelay - avgAura) / (baseDelay || 1)) * 100)));
+        if (cfSavingsEl) {
+            cfSavingsEl.textContent = `${savings}% Less Delay`;
+        }
+    }
 }
 
 function generateAuraExplanation(jState) {
+    if (jState.aura.emergency && jState.aura.emergency.active) {
+        return `🚨 EMERGENCY VEHICLE CLEARING CORRIDOR (${jState.aura.emergency.approach || 'APPROACHING'}). Authoritative priority green active.`;
+    }
+    
     const bp = jState.aura.back_pressure_multiplier;
     let maxQ = 0;
     let bottleneckDir = "";
     
-    Object.keys(jState.aura.approaches).forEach(dir => {
-        if (jState.aura.approaches[dir].queue_pcu > maxQ) {
-            maxQ = jState.aura.approaches[dir].queue_pcu;
-            bottleneckDir = dir;
-        }
-    });
+    if (jState.aura.approaches) {
+        Object.keys(jState.aura.approaches).forEach(dir => {
+            if (jState.aura.approaches[dir].queue_pcu > maxQ) {
+                maxQ = jState.aura.approaches[dir].queue_pcu;
+                bottleneckDir = dir;
+            }
+        });
+    }
 
-    if (false) {
-        return `🚨 EMERGENCY VEHICLE CLEARING CORRIDOR. Absolute priority green granted for emergency transit.`;
-    } else if (bp < 0.8) {
+    if (bp < 0.8) {
         return `Downstream saturation detected along arterial corridor. Applied backpressure penalty (x${bp.toFixed(2)}) to meter incoming traffic and prevent spillback.`;
-    } else if (maxQ > 20) {
-        return `Elevated demand detected on ${bottleneckDir} approach (${maxQ.toFixed(1)} PCU). AURA actively extending green time allocation.`;
+    } else if (maxQ > 15) {
+        return `Elevated demand detected on ${bottleneckDir} approach (${maxQ.toFixed(1)} PCU). AURA dynamically extending green phase.`;
     } else {
         return `Corridor flows operating within nominal bounds. AURA synchronizing green wave progression across adjacent junctions.`;
     }
@@ -599,15 +695,20 @@ function updateGreenWavePanel(gwData) {
 // Provenance / Data Source Badge Update
 // -------------------------------------------------------------
 function updateDataSourceLabel(networkState) {
+    if (!dataSourceLabel) return;
     let hasLive = false;
     let hasReplay = false;
 
-    networkState.forEach(j => {
-        Object.values(j.aura.approaches).forEach(app => {
-            if (app.source_mode === "LIVE") hasLive = true;
-            if (app.source_mode === "REPLAY") hasReplay = true;
+    if (networkState) {
+        networkState.forEach(j => {
+            if (j.aura && j.aura.approaches) {
+                Object.values(j.aura.approaches).forEach(app => {
+                    if (app.source_mode === "LIVE") hasLive = true;
+                    if (app.source_mode === "REPLAY") hasReplay = true;
+                });
+            }
         });
-    });
+    }
 
     if (hasLive) {
         dataSourceLabel.textContent = "DATA: LIVE VISION";
@@ -622,170 +723,167 @@ function updateDataSourceLabel(networkState) {
 }
 
 // -------------------------------------------------------------
-// Emergency Simulation Engine (Control Room Feature)
+// Geometry / Distance Utility Helpers
 // -------------------------------------------------------------
-btnSimulateEmergency.addEventListener('click', () => {
-    if (store.emergencyActive) return;
-    startEmergencySimulation();
-});
-
-function startEmergencySimulation() {
-    if (!store.graph) return;
-    store.emergencyActive = true;
-    btnSimulateEmergency.disabled = true;
-    btnSimulateEmergency.classList.add('opacity-50', 'cursor-not-allowed');
-
-    // Display Emergency HUD immediately
-    if (emergencyHud) {
-        emergencyHud.classList.remove('hidden');
-        document.getElementById('hud-dest-hospital').textContent = "Locating Nearest Emergency Hospital...";
-        document.getElementById('hud-eta').textContent = "CALCULATING";
-        document.getElementById('hud-status').textContent = "ACQUIRING PRIORITY CORRIDOR...";
-    }
-
-    // 1. Pick a realistic random emergency origin in Kochi
-    const candidateOrigins = [
-        { name: "Palarivattom Bypass", lat: 10.0055, lng: 76.3120 },
-        { name: "Edappally Toll", lat: 10.0270, lng: 76.3090 },
-        { name: "Kaloor Stadium", lat: 9.9920, lng: 76.2970 },
-        { name: "Kakkanad Road", lat: 10.0080, lng: 76.3240 },
-        { name: "Vyttila Hub", lat: 9.9650, lng: 76.3210 }
-    ];
-    const emOrigin = candidateOrigins[Math.floor(Math.random() * candidateOrigins.length)];
-
-    // 2. Curated 10 hospitals
-    const hospitals = store.graph.pois.filter(p => /hospital/i.test(p.name));
-    if (hospitals.length === 0) return;
-
-    const randomHospital = hospitals[Math.floor(Math.random() * hospitals.length)];
-    store.currentEmergencyHospital = randomHospital.name;
-
-    ws.send(JSON.stringify({
-        event: "ROUTE_REQUEST",
-        isEmergency: true,
-        data: {
-            origin: { lat: emOrigin.lat, lng: emOrigin.lng },
-            destination: randomHospital.nearestNode || { lat: randomHospital.lat, lng: randomHospital.lng }
-        }
-    }));
-}
-
-function handleEmergencyRoute(data) {
-    const routeGeom = data.aura.geometry || data.individual.geometry;
-    if (!routeGeom || routeGeom.length === 0) {
-        endEmergencySimulation();
-        return;
-    }
-
-    if (!map.hasLayer(emergencyLayer)) {
-        emergencyLayer.addTo(map);
-    }
-    emergencyLayer.clearLayers();
-
-    const juncsPassed = data.aura.controlledJunctionsPassed || [];
-    
-    // Display Emergency HUD
-    if (emergencyHud) {
-        emergencyHud.classList.remove('hidden');
-        document.getElementById('hud-dest-hospital').textContent = store.currentEmergencyHospital || "🏥 Major Hospital";
-        document.getElementById('hud-eta').textContent = `${Math.ceil(data.aura.estimatedTime || 120)}s`;
-        document.getElementById('hud-status').textContent = `CLEARING ${juncsPassed.length} AURA JUNCTIONS`;
-    }
-
-    // Draw glowing Red/Blue pulsing emergency priority route
-    const emPolyline = L.polyline(routeGeom, {
-        color: '#EF4444',
-        weight: 6,
-        opacity: 0.95,
-        lineCap: 'round'
-    }).addTo(emergencyLayer);
-
-    // Outer emergency siren aura
-    L.polyline(routeGeom, {
-        color: '#3B82F6',
-        weight: 12,
-        opacity: 0.45,
-        lineCap: 'round'
-    }).addTo(emergencyLayer);
-
-    map.fitBounds(emPolyline.getBounds(), { padding: [80, 80] });
-
-    // Spawn Emergency Ambulance Marker (🚑 with pulsing siren)
-    const emIcon = L.divIcon({
-        className: 'emergency-custom-marker',
-        html: `
-            <div class="relative flex items-center justify-center w-8 h-8 rounded-full bg-[#EF4444] border-2 border-white shadow-2xl emergency-siren">
-                <span class="text-sm">🚑</span>
-            </div>
-        `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
-    });
-
-    const startPt = routeGeom[0];
-    emergencyMarker = L.marker([startPt[0], startPt[1]], { icon: emIcon }).addTo(emergencyLayer);
-
-    // Physically animate ambulance along the route geometry
-    const totalDuration = 14000; // 14 seconds transit animation
-    const startTime = performance.now();
-
-    function animateAmbulance(currentTime) {
-        if (!store.emergencyActive) return;
-        const elapsed = currentTime - startTime;
-        const progress = Math.min(1.0, elapsed / totalDuration);
-
-        // Interpolate along route geometry
-        const currentCoord = interpolatePolyline(routeGeom, progress);
-        if (currentCoord && emergencyMarker) {
-            emergencyMarker.setLatLng([currentCoord[0], currentCoord[1]]);
-
-            // Update remaining ETA
-            const remainingSecs = Math.max(0, Math.ceil((1 - progress) * (data.aura.estimatedTime || 120)));
-            document.getElementById('hud-eta').textContent = `${remainingSecs}s`;
-
-            // Check proximity to controlled junctions for SIGNAL PREEMPTION
-            store.graph.controlledJunctions.forEach(j => {
-                const distToJunc = getDistanceMeters(currentCoord[0], currentCoord[1], j.lat, j.lng);
-                if (distToJunc < 220) {
-                    // Preempt this junction: give emergency green
-                    store.emergencyPreemptions[j.id] = "NORTHBOUND"; // Give primary passage
-                    document.getElementById('hud-status').textContent = `🚨 ${j.id} EMERGENCY GREEN OVERRIDE`;
-                } else if (distToJunc > 300 && store.emergencyPreemptions[j.id]) {
-                    // Restored after clearing
-                    delete store.emergencyPreemptions[j.id];
-                }
-            });
-        }
-
-        if (progress < 1.0) {
-            requestAnimationFrame(animateAmbulance);
-        } else {
-            // Patient delivered
-            document.getElementById('hud-status').textContent = "✅ PATIENT DELIVERED — SIGNALS RESTORED";
-            document.getElementById('hud-eta').textContent = "0s";
-            setTimeout(() => {
-                endEmergencySimulation();
-            }, 3000);
-        }
-    }
-
-    requestAnimationFrame(animateAmbulance);
-}
-
-function endEmergencySimulation() {
-    store.emergencyActive = false;
-    store.emergencyPreemptions = {};
-    emergencyHud.classList.add('hidden');
-    if (emergencyLayer) emergencyLayer.clearLayers();
-    emergencyMarker = null;
-    btnSimulateEmergency.disabled = false;
-    btnSimulateEmergency.classList.remove('opacity-50', 'cursor-not-allowed');
-}
-
 function getDistanceMeters(lat1, lng1, lat2, lng2) {
     const dLat = (lat2 - lat1) * 111320;
     const dLng = (lng2 - lng1) * 111320 * Math.cos(lat1 * Math.PI / 180);
     return Math.sqrt(dLat * dLat + dLng * dLng);
+}
+
+function interpolatePolyline(coords, progress) {
+    if (!coords || coords.length === 0) return null;
+    if (coords.length === 1 || progress <= 0) return coords[0];
+    if (progress >= 1) return coords[coords.length - 1];
+
+    let totalDist = 0;
+    const dists = [];
+    for (let i = 0; i < coords.length - 1; i++) {
+        const d = getDistanceMeters(coords[i][0], coords[i][1], coords[i+1][0], coords[i+1][1]);
+        dists.push(d);
+        totalDist += d;
+    }
+
+    if (totalDist === 0) return coords[0];
+
+    const targetDist = progress * totalDist;
+    let accum = 0;
+    for (let i = 0; i < dists.length; i++) {
+        if (accum + dists[i] >= targetDist) {
+            const segProgress = dists[i] > 0 ? (targetDist - accum) / dists[i] : 0;
+            const lat = coords[i][0] + (coords[i+1][0] - coords[i][0]) * segProgress;
+            const lng = coords[i][1] + (coords[i+1][1] - coords[i][1]) * segProgress;
+            return [lat, lng];
+        }
+        accum += dists[i];
+    }
+    return coords[coords.length - 1];
+}
+
+// -------------------------------------------------------------
+// Emergency Preemption & Live Tracking
+// -------------------------------------------------------------
+if (btnSimulateEmergency) {
+    btnSimulateEmergency.addEventListener('click', () => {
+        if (store.emergencyActive) return;
+        ws.send(JSON.stringify({ event: "TRIGGER_EMERGENCY" }));
+        btnSimulateEmergency.disabled = true;
+        btnSimulateEmergency.classList.add('opacity-50', 'cursor-not-allowed');
+    });
+}
+
+function handleEmergencyUpdate(data) {
+    if (!data) return;
+
+    if (data.active) {
+        store.emergencyActive = true;
+        if (btnSimulateEmergency) {
+            btnSimulateEmergency.disabled = true;
+            btnSimulateEmergency.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+
+        if (emergencyHud) {
+            emergencyHud.classList.remove('hidden');
+            const destEl = document.getElementById('hud-dest-hospital');
+            const etaEl = document.getElementById('hud-eta');
+            const statusEl = document.getElementById('hud-status');
+
+            if (destEl) destEl.textContent = data.hospital || "🏥 Major Hospital";
+            const distKm = ((data.distanceRemaining || 0) / 1000).toFixed(1);
+            if (etaEl) etaEl.textContent = `${Math.ceil((data.distanceRemaining || 0) / 15)}s (${distKm} km)`;
+            if (statusEl) statusEl.textContent = data.junctionsRemaining > 0 ? `PREEMPTING ${data.junctionsRemaining} AURA JUNCTIONS` : "APPROACHING DESTINATION";
+        }
+
+        if (map && emergencyLayer) {
+            if (!map.hasLayer(emergencyLayer)) emergencyLayer.addTo(map);
+
+            // Draw route geometry if available and not yet drawn
+            if (data.geometry && data.geometry.length > 1 && !emergencyPolyline) {
+                emergencyPolyline = L.polyline(data.geometry, {
+                    color: '#EF4444',
+                    weight: 6,
+                    opacity: 0.95,
+                    lineCap: 'round'
+                }).addTo(emergencyLayer);
+
+                emergencyGlowPolyline = L.polyline(data.geometry, {
+                    color: '#3B82F6',
+                    weight: 12,
+                    opacity: 0.45,
+                    lineCap: 'round'
+                }).addTo(emergencyLayer);
+            }
+
+            // Update Ambulance Marker position
+            if (data.currentPos) {
+                if (!emergencyMarker) {
+                    const emIcon = L.divIcon({
+                        className: 'emergency-custom-marker',
+                        html: `
+                            <div class="relative flex items-center justify-center w-8 h-8 rounded-full bg-[#EF4444] border-2 border-white shadow-2xl emergency-siren">
+                                <span class="text-sm">🚑</span>
+                            </div>
+                        `,
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16]
+                    });
+                    emergencyMarker = L.marker(data.currentPos, { icon: emIcon }).addTo(emergencyLayer);
+                } else {
+                    emergencyMarker.setLatLng(data.currentPos);
+                }
+            }
+        }
+    } else {
+        // Emergency ended
+        store.emergencyActive = false;
+        if (emergencyHud) emergencyHud.classList.add('hidden');
+        if (emergencyLayer) emergencyLayer.clearLayers();
+        emergencyMarker = null;
+        emergencyPolyline = null;
+        emergencyGlowPolyline = null;
+
+        if (btnSimulateEmergency) {
+            btnSimulateEmergency.disabled = false;
+            btnSimulateEmergency.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// Demo Controls (Start / Pause / Reset)
+// -------------------------------------------------------------
+if (btnDemoStart) {
+    btnDemoStart.addEventListener('click', () => {
+        ws.send(JSON.stringify({ event: 'START_DEMO' }));
+        btnDemoStart.classList.add('hidden');
+        if (btnDemoPause) btnDemoPause.classList.remove('hidden');
+    });
+}
+
+if (btnDemoPause) {
+    btnDemoPause.addEventListener('click', () => {
+        ws.send(JSON.stringify({ event: 'PAUSE_DEMO' }));
+        btnDemoPause.classList.add('hidden');
+        if (btnDemoStart) btnDemoStart.classList.remove('hidden');
+    });
+}
+
+if (btnDemoReset) {
+    btnDemoReset.addEventListener('click', () => {
+        ws.send(JSON.stringify({ event: 'RESET_DEMO' }));
+        if (btnDemoPause) btnDemoPause.classList.add('hidden');
+        if (btnDemoStart) btnDemoStart.classList.remove('hidden');
+        if (emergencyHud) emergencyHud.classList.add('hidden');
+        if (emergencyLayer) emergencyLayer.clearLayers();
+        emergencyMarker = null;
+        emergencyPolyline = null;
+        emergencyGlowPolyline = null;
+        store.emergencyActive = false;
+        if (btnSimulateEmergency) {
+            btnSimulateEmergency.disabled = false;
+            btnSimulateEmergency.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    });
 }
 
 // -------------------------------------------------------------
@@ -793,6 +891,7 @@ function getDistanceMeters(lat1, lng1, lat2, lng2) {
 // -------------------------------------------------------------
 function populateRoutingSelects(graphData) {
     const dest = document.getElementById('user-destination');
+    if (!dest) return;
     dest.innerHTML = '';
     
     const defaultOpt = new Option('Select destination landmark / area...', '');
@@ -820,17 +919,8 @@ function populateRoutingSelects(graphData) {
             { name: "Ernakulam Junction (South Railway Station)", node: "277167594" },
             { name: "Ernakulam Town (North Railway Station)", node: "2440749520" },
             { name: "Vyttila Bus & Water Metro Terminal", node: "2923377480" }
-        ],
-        'Major Emergency Hospitals': []
+        ]
     };
-
-    // Populate 10 major hospitals
-    if (graphData.pois) {
-        const hospitals = graphData.pois.filter(p => /hospital/i.test(p.name));
-        hospitals.forEach(h => {
-            categories['Major Emergency Hospitals'].push({ name: h.name, node: h.nearestNode });
-        });
-    }
 
     Object.keys(categories).forEach(catName => {
         const items = categories[catName];
@@ -850,130 +940,160 @@ function setOriginLocation(lat, lng) {
     store.userOriginLat = lat;
     store.userOriginLng = lng;
     
-    if (userOriginMarker && map.hasLayer(userOriginMarker)) map.removeLayer(userOriginMarker);
+    if (userOriginMarker && map && map.hasLayer(userOriginMarker)) map.removeLayer(userOriginMarker);
     
-    userOriginMarker = L.marker([lat, lng], {
-        icon: L.divIcon({
-            className: 'user-origin-pin',
-            html: `
-                <div class="flex items-center justify-center w-6 h-6 rounded-full bg-[#10B981] border-2 border-white shadow-xl">
-                    <span class="text-[9px] font-bold text-white">A</span>
-                </div>
-            `,
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
-        })
-    }).addTo(map);
-    userOriginMarker.bindTooltip("📍 START LOCATION", { permanent: true, direction: "top", className: "aura-tooltip" }).openTooltip();
+    if (map) {
+        userOriginMarker = L.marker([lat, lng], {
+            icon: L.divIcon({
+                className: 'user-origin-pin',
+                html: `
+                    <div class="flex items-center justify-center w-6 h-6 rounded-full bg-[#10B981] border-2 border-white shadow-xl">
+                        <span class="text-[9px] font-bold text-white">A</span>
+                    </div>
+                `,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+            })
+        }).addTo(map);
+        userOriginMarker.bindTooltip("📍 START LOCATION", { permanent: true, direction: "top", className: "aura-tooltip" }).openTooltip();
+    }
     
     const disp = document.getElementById('origin-display');
-    disp.classList.remove('hidden');
-    disp.className = "text-xs font-mono text-[#10B981] px-3 py-2 bg-[#10B981]/10 rounded border border-[#10B981]/30";
-    disp.textContent = `Origin: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    if (disp) {
+        disp.classList.remove('hidden');
+        disp.className = "text-xs font-mono text-[#10B981] px-3 py-2 bg-[#10B981]/10 rounded border border-[#10B981]/30";
+        disp.textContent = `Origin: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
 }
 
 function setDestinationLocation(lat, lng) {
     store.userDest = { lat, lng };
     
-    if (userDestMarker && map.hasLayer(userDestMarker)) map.removeLayer(userDestMarker);
+    if (userDestMarker && map && map.hasLayer(userDestMarker)) map.removeLayer(userDestMarker);
     
-    userDestMarker = L.marker([lat, lng], {
-        icon: L.divIcon({
-            className: 'user-dest-pin',
-            html: `
-                <div class="flex items-center justify-center w-6 h-6 rounded-full bg-[#EF4444] border-2 border-white shadow-xl">
-                    <span class="text-[9px] font-bold text-white">B</span>
-                </div>
-            `,
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
-        })
-    }).addTo(map);
-    userDestMarker.bindTooltip("🎯 DESTINATION", { permanent: true, direction: "top", className: "aura-tooltip" }).openTooltip();
+    if (map) {
+        userDestMarker = L.marker([lat, lng], {
+            icon: L.divIcon({
+                className: 'user-dest-pin',
+                html: `
+                    <div class="flex items-center justify-center w-6 h-6 rounded-full bg-[#EF4444] border-2 border-white shadow-xl">
+                        <span class="text-[9px] font-bold text-white">B</span>
+                    </div>
+                `,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+            })
+        }).addTo(map);
+        userDestMarker.bindTooltip("🎯 DESTINATION", { permanent: true, direction: "top", className: "aura-tooltip" }).openTooltip();
+    }
     
     const destSelect = document.getElementById('user-destination');
-    destSelect.value = '';
+    if (destSelect) destSelect.value = '';
     
     const destDisp = document.getElementById('dest-display');
-    destDisp.classList.remove('hidden');
-    destDisp.textContent = `Map Destination: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    if (destDisp) {
+        destDisp.classList.remove('hidden');
+        destDisp.textContent = `Map Destination: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
 }
 
-document.getElementById('btn-use-location').addEventListener('click', () => {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(pos => {
-            setOriginLocation(pos.coords.latitude, pos.coords.longitude);
-            map.panTo([pos.coords.latitude, pos.coords.longitude]);
-        }, () => {
+const btnUseLocation = document.getElementById('btn-use-location');
+if (btnUseLocation) {
+    btnUseLocation.addEventListener('click', () => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(pos => {
+                setOriginLocation(pos.coords.latitude, pos.coords.longitude);
+                if (map) map.panTo([pos.coords.latitude, pos.coords.longitude]);
+            }, () => {
+                setOriginLocation(10.0242, 76.3084);
+                if (map) map.panTo([10.0242, 76.3084]);
+            });
+        } else {
             setOriginLocation(10.0242, 76.3084);
-            map.panTo([10.0242, 76.3084]);
-        });
-    } else {
-        setOriginLocation(10.0242, 76.3084);
-        map.panTo([10.0242, 76.3084]);
-    }
-});
-
-document.getElementById('btn-map-origin').addEventListener('click', () => {
-    isMapOriginSelectionMode = true;
-    isMapDestSelectionMode = false;
-    document.getElementById('map').style.cursor = 'crosshair';
-    const disp = document.getElementById('origin-display');
-    disp.classList.remove('hidden');
-    disp.className = "text-xs font-mono text-[#F59E0B] px-3 py-2 bg-[#F59E0B]/10 rounded border border-[#F59E0B]/30";
-    disp.textContent = "Click anywhere on a Kochi road to set START point.";
-});
-
-document.getElementById('btn-map-dest').addEventListener('click', () => {
-    isMapDestSelectionMode = true;
-    isMapOriginSelectionMode = false;
-    document.getElementById('map').style.cursor = 'crosshair';
-    const destDisp = document.getElementById('dest-display');
-    destDisp.classList.remove('hidden');
-    destDisp.className = "text-xs font-mono text-[#F59E0B] px-3 py-1.5 bg-[#F59E0B]/10 rounded border border-[#F59E0B]/30 mt-1";
-    destDisp.textContent = "Click anywhere on a Kochi road to set DESTINATION.";
-});
-
-document.getElementById('user-destination').addEventListener('change', (e) => {
-    store.userDest = e.target.value;
-    document.getElementById('dest-display').classList.add('hidden');
-    if (userDestMarker && map.hasLayer(userDestMarker)) {
-        map.removeLayer(userDestMarker);
-        userDestMarker = null;
-    }
-});
-
-document.getElementById('btn-user-route').addEventListener('click', () => {
-    if (!store.userOriginLat || !store.userOriginLng) {
-        alert("Please set a starting location first.");
-        return;
-    }
-    
-    let dest = store.userDest || document.getElementById('user-destination').value;
-    if (!dest) {
-        alert("Please choose a destination first.");
-        return;
-    }
-    
-    ws.send(JSON.stringify({
-        event: "ROUTE_REQUEST",
-        data: { 
-            origin: { lat: store.userOriginLat, lng: store.userOriginLng }, 
-            destination: dest 
+            if (map) map.panTo([10.0242, 76.3084]);
         }
-    }));
-});
+    });
+}
+
+const btnMapOrigin = document.getElementById('btn-map-origin');
+if (btnMapOrigin) {
+    btnMapOrigin.addEventListener('click', () => {
+        isMapOriginSelectionMode = true;
+        isMapDestSelectionMode = false;
+        const mapEl = document.getElementById('map');
+        if (mapEl) mapEl.style.cursor = 'crosshair';
+        const disp = document.getElementById('origin-display');
+        if (disp) {
+            disp.classList.remove('hidden');
+            disp.className = "text-xs font-mono text-[#F59E0B] px-3 py-2 bg-[#F59E0B]/10 rounded border border-[#F59E0B]/30";
+            disp.textContent = "Click anywhere on a Kochi road to set START point.";
+        }
+    });
+}
+
+const btnMapDest = document.getElementById('btn-map-dest');
+if (btnMapDest) {
+    btnMapDest.addEventListener('click', () => {
+        isMapDestSelectionMode = true;
+        isMapOriginSelectionMode = false;
+        const mapEl = document.getElementById('map');
+        if (mapEl) mapEl.style.cursor = 'crosshair';
+        const destDisp = document.getElementById('dest-display');
+        if (destDisp) {
+            destDisp.classList.remove('hidden');
+            destDisp.className = "text-xs font-mono text-[#F59E0B] px-3 py-1.5 bg-[#F59E0B]/10 rounded border border-[#F59E0B]/30 mt-1";
+            destDisp.textContent = "Click anywhere on a Kochi road to set DESTINATION.";
+        }
+    });
+}
+
+const userDestSelect = document.getElementById('user-destination');
+if (userDestSelect) {
+    userDestSelect.addEventListener('change', (e) => {
+        store.userDest = e.target.value;
+        const destDisp = document.getElementById('dest-display');
+        if (destDisp) destDisp.classList.add('hidden');
+        if (userDestMarker && map && map.hasLayer(userDestMarker)) {
+            map.removeLayer(userDestMarker);
+            userDestMarker = null;
+        }
+    });
+}
+
+const btnUserRoute = document.getElementById('btn-user-route');
+if (btnUserRoute) {
+    btnUserRoute.addEventListener('click', () => {
+        if (!store.userOriginLat || !store.userOriginLng) {
+            alert("Please set a starting location first (use 'My Location' or 'Pick on Map').");
+            return;
+        }
+        
+        let dest = store.userDest || (userDestSelect ? userDestSelect.value : null);
+        if (!dest) {
+            alert("Please choose a destination landmark or click 'Pick on Map'.");
+            return;
+        }
+        
+        ws.send(JSON.stringify({
+            event: "ROUTE_REQUEST",
+            data: { 
+                origin: { lat: store.userOriginLat, lng: store.userOriginLng }, 
+                destination: dest 
+            }
+        }));
+    });
+}
 
 function drawRoutePolylines(auraData, fastData) {
+    if (!map || !routingLayer) return;
     if (!map.hasLayer(routingLayer)) {
         routingLayer.addTo(map);
     }
     routingLayer.clearLayers();
-    if (!store.graph) return;
 
     const allPoints = [];
 
-    // Draw Fast path (dashed amber)
+    // Draw Direct path (dashed amber)
     if (fastData && fastData.geometry && fastData.geometry.length > 0) {
         L.polyline(fastData.geometry, {
             color: '#F59E0B',
@@ -985,7 +1105,7 @@ function drawRoutePolylines(auraData, fastData) {
         fastData.geometry.forEach(pt => allPoints.push(pt));
     }
 
-    // Draw AURA path (solid glowing green with neon core)
+    // Draw AURA Recommended path (solid glowing green with neon core)
     if (auraData && auraData.geometry && auraData.geometry.length > 0) {
         // Outer glow
         L.polyline(auraData.geometry, {
@@ -1017,35 +1137,38 @@ function handleRouteResult(data) {
         return;
     }
 
-    if (store.emergencyActive) {
-        handleEmergencyRoute(data);
-        return;
-    }
-
     const resultsContainer = document.getElementById('user-route-results');
-    resultsContainer.classList.remove('hidden');
+    if (resultsContainer) resultsContainer.classList.remove('hidden');
 
     const aura = data.aura;
     const fast = data.individual;
+    if (!aura || !fast) return;
 
-    const auraJuncs = aura.controlledJunctionsPassed.map(j => `<span class="px-2 py-0.5 bg-[#161b22] border border-[#30363d] rounded text-white text-[10px] font-semibold">${j.name}</span>`).join(' ➔ ');
-    const fastJuncs = fast.controlledJunctionsPassed.map(j => j.name).join(' → ');
+    const auraJuncs = (aura.controlledJunctionsPassed || []).map(j => `<span class="px-2 py-0.5 bg-[#161b22] border border-[#30363d] rounded text-white text-[10px] font-semibold">${j.name}</span>`).join(' ➔ ');
+    const fastJuncs = (fast.controlledJunctionsPassed || []).map(j => j.name).join(' → ');
 
     // Display realistic travel time and actual distance in km
-    const auraMin = Math.ceil(aura.estimatedTime / 60);
-    const fastMin = Math.ceil(fast.estimatedTime / 60);
+    const auraMin = Math.ceil((aura.estimatedTime || 60) / 60);
+    const fastMin = Math.ceil((fast.estimatedTime || 60) / 60);
     const distText = aura.distanceKm ? ` (${aura.distanceKm} km)` : '';
 
-    document.getElementById('aura-time').textContent = `${auraMin} min${distText}`;
-    document.getElementById('aura-path').innerHTML = auraJuncs || "<span class='text-[#8b949e]'>Direct Arterial (No Bottlenecks)</span>";
-    document.getElementById('aura-explanation').textContent = aura.explanation || "AURA cooperative routing applied.";
+    const auraTime = document.getElementById('aura-time');
+    const auraPath = document.getElementById('aura-path');
+    const auraExplanation = document.getElementById('aura-explanation');
+    const fastTime = document.getElementById('fast-time');
+    const fastPath = document.getElementById('fast-path');
+    const fastExplanation = document.getElementById('fast-explanation');
+
+    if (auraTime) auraTime.textContent = `${auraMin} min${distText}`;
+    if (auraPath) auraPath.innerHTML = auraJuncs || "<span class='text-[#8b949e]'>Direct Arterial (No Bottlenecks)</span>";
+    if (auraExplanation) auraExplanation.textContent = aura.explanation || "AURA cooperative routing applied.";
     
-    document.getElementById('fast-time').textContent = `${fastMin} min${distText}`;
-    document.getElementById('fast-path').textContent = fastJuncs ? `Corridors: ${fastJuncs}` : "Direct Shortest Route";
-    document.getElementById('fast-explanation').textContent = fast.explanation || "Shortest direct path without cooperative network smoothing.";
+    if (fastTime) fastTime.textContent = `${fastMin} min${distText}`;
+    if (fastPath) fastPath.textContent = fastJuncs ? `Corridors: ${fastJuncs}` : "Direct Shortest Route";
+    if (fastExplanation) fastExplanation.textContent = fast.explanation || "Shortest direct path without cooperative network smoothing.";
     
     // Draw destination pin
-    if (aura.geometry && aura.geometry.length > 0) {
+    if (aura.geometry && aura.geometry.length > 0 && map) {
         const endPt = aura.geometry[aura.geometry.length - 1];
         if (!userDestMarker) {
             userDestMarker = L.marker([endPt[0], endPt[1]], {
@@ -1068,29 +1191,42 @@ function handleRouteResult(data) {
 }
 
 // Insights Panel Toggle
-document.getElementById('btn-toggle-insights').addEventListener('click', () => {
-    const content = document.getElementById('insights-content');
-    const icon = document.getElementById('cr-insights-icon');
-    if (content.classList.contains('hidden')) {
-        content.classList.remove('hidden');
-        icon.textContent = '▼';
-    } else {
-        content.classList.add('hidden');
-        icon.textContent = '▲';
-    }
-});
+const btnToggleInsights = document.getElementById('btn-toggle-insights');
+if (btnToggleInsights) {
+    btnToggleInsights.addEventListener('click', () => {
+        const content = document.getElementById('insights-content');
+        const icon = document.getElementById('cr-insights-icon');
+        if (content && icon) {
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                icon.textContent = '▼';
+            } else {
+                content.classList.add('hidden');
+                icon.textContent = '▲';
+            }
+        }
+    });
+}
 
 // -------------------------------------------------------------
 // WebSocket Live Telemetry Connection
 // -------------------------------------------------------------
 ws.onopen = () => {
-    connectionStatus.textContent = "● CONNECTED";
-    connectionStatus.className = "text-[10px] font-mono font-bold text-[#10B981] px-2.5 py-1.5 rounded bg-[#161b22] border border-[#10B981]/30";
+    if (connectionStatus) {
+        connectionStatus.textContent = "● CONNECTED";
+        connectionStatus.className = "text-[10px] font-mono font-bold text-[#10B981] px-2.5 py-1.5 rounded bg-[#161b22] border border-[#10B981]/30";
+    }
 };
 
 ws.onclose = () => {
-    connectionStatus.textContent = "● DISCONNECTED";
-    connectionStatus.className = "text-[10px] font-mono font-bold text-[#EF4444] px-2.5 py-1.5 rounded bg-[#161b22] border border-[#EF4444]/30";
+    if (connectionStatus) {
+        connectionStatus.textContent = "● DISCONNECTED";
+        connectionStatus.className = "text-[10px] font-mono font-bold text-[#EF4444] px-2.5 py-1.5 rounded bg-[#161b22] border border-[#EF4444]/30";
+    }
+};
+
+ws.onerror = (err) => {
+    console.error("WebSocket error:", err);
 };
 
 ws.onmessage = (evt) => {
@@ -1102,42 +1238,10 @@ ws.onmessage = (evt) => {
             store.updateTrafficState(payload.data);
         } else if (payload.event === "ROUTE_RESULT") {
             handleRouteResult(payload.data);
+        } else if (payload.event === "EMERGENCY_UPDATE") {
+            handleEmergencyUpdate(payload.data);
         }
     } catch (e) {
         console.error("WebSocket payload error", e);
     }
 };
-
-
-document.addEventListener('DOMContentLoaded', () => {
-    // Inject Demo Controls into Control Room Header
-    const crHeader = document.querySelector('.bg-\[\#0d1117\].border-b.border-\[\#30363d\].px-6.py-4 .flex.items-center.gap-6');
-    if (crHeader) {
-        const demoControls = document.createElement('div');
-        demoControls.className = "flex items-center gap-2 ml-auto";
-        demoControls.innerHTML = `
-            <button id="btn-demo-start" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold rounded shadow transition-colors">START DEMO</button>
-            <button id="btn-demo-pause" class="px-3 py-1 bg-yellow-600 hover:bg-yellow-500 text-white font-mono text-xs font-bold rounded shadow transition-colors hidden">PAUSE</button>
-            <button id="btn-demo-reset" class="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white font-mono text-xs font-bold rounded shadow transition-colors">RESET</button>
-        `;
-        crHeader.appendChild(demoControls);
-        
-        document.getElementById('btn-demo-start').addEventListener('click', (e) => {
-            ws.send(JSON.stringify({ event: 'START_DEMO' }));
-            e.target.classList.add('hidden');
-            document.getElementById('btn-demo-pause').classList.remove('hidden');
-        });
-        
-        document.getElementById('btn-demo-pause').addEventListener('click', (e) => {
-            ws.send(JSON.stringify({ event: 'PAUSE_DEMO' }));
-            e.target.classList.add('hidden');
-            document.getElementById('btn-demo-start').classList.remove('hidden');
-        });
-        
-        document.getElementById('btn-demo-reset').addEventListener('click', () => {
-            ws.send(JSON.stringify({ event: 'RESET_DEMO' }));
-            document.getElementById('btn-demo-pause').classList.add('hidden');
-            document.getElementById('btn-demo-start').classList.remove('hidden');
-        });
-    }
-});

@@ -112,6 +112,8 @@ wss.on('connection', (ws) => {
                 demoController.pause();
             } else if (payload.event === "RESET_DEMO") {
                 demoController.reset();
+            } else if (payload.event === "TRIGGER_EMERGENCY") {
+                demoController.triggerEmergency(payload.data?.origin);
             }
         } catch (e) {
             console.error("WS error", e);
@@ -175,19 +177,21 @@ setInterval(() => {
 
     const junctionsState = junctionIds.map(jid => {
         const auraState = aura.getJunctionState(jid);
-        const baselineState = baseline.getJunctionState(jid);
+        const counterfactual = baseline.getCounterfactualState(jid);
 
         approaches.forEach(appr => {
             const sm = aura.state[jid].approaches[appr].source_mode;
-            if(auraState.approaches[appr]) auraState.approaches[appr].source_mode = sm;
-            if(baselineState.approaches[appr]) baselineState.approaches[appr].source_mode = sm;
+            if (auraState.approaches[appr]) auraState.approaches[appr].source_mode = sm;
         });
+
+        auraState.counterfactual = counterfactual;
 
         return {
             junction_id: jid,
+            phase_name: auraState.phase_name,
             current_phase: auraState.current_phase,
             aura: auraState,
-            baseline: baselineState
+            counterfactual: counterfactual
         };
     });
 

@@ -127,6 +127,19 @@
         </div>
 
         <div class="flex gap-3 items-center">
+            <!-- Demo Controls -->
+            <div class="flex items-center gap-1.5 bg-[#161b22] px-2 py-1 rounded-md border border-[#30363d]">
+                <button id="btn-demo-start" class="px-2.5 py-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-mono text-[10px] font-bold rounded shadow transition-colors flex items-center gap-1">
+                    <span>▶</span> START DEMO
+                </button>
+                <button id="btn-demo-pause" class="px-2.5 py-1 bg-[#D97706] hover:bg-[#B45309] text-white font-mono text-[10px] font-bold rounded shadow transition-colors hidden flex items-center gap-1">
+                    <span>⏸</span> PAUSE
+                </button>
+                <button id="btn-demo-reset" class="px-2.5 py-1 bg-[#374151] hover:bg-[#4B5563] text-[#e6edf3] font-mono text-[10px] font-bold rounded shadow transition-colors flex items-center gap-1">
+                    <span>↺</span> RESET
+                </button>
+            </div>
+
             <!-- Emergency Preemption Simulation Button -->
             <button id="btn-simulate-emergency" class="px-3 py-1.5 bg-gradient-to-r from-[#DC2626] to-[#EF4444] hover:from-[#B91C1C] hover:to-[#DC2626] text-white text-xs font-bold rounded-md border border-[#F87171]/50 shadow-[0_0_14px_rgba(220,38,38,0.5)] transition-all flex items-center gap-1.5 active:scale-95">
                 <span class="text-sm">🚨</span>
@@ -333,6 +346,30 @@
                             <div class="flex justify-between items-center">
                                 <span class="text-[#8b949e]">Last Telemetry Update</span> 
                                 <span id="ev-timestamp" class="font-mono text-[#8b949e] text-[10px]">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Counterfactual Baseline Comparison (Reference Only) -->
+                    <div class="flex flex-col gap-2.5 pb-2">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 rounded-full bg-[#6B7280]"></span> Benchmark Comparison
+                            </h3>
+                            <span class="text-[9px] font-mono text-[#8b949e] bg-[#21262d] px-1.5 py-0.5 rounded border border-[#30363d]">OFFLINE REFERENCE</span>
+                        </div>
+                        <div class="bg-[#161b22] border border-[#30363d] rounded-lg p-3.5 flex flex-col gap-2.5 text-xs">
+                            <div class="flex justify-between items-center pb-2 border-b border-[#21262d]">
+                                <span class="text-[#8b949e]">Reference Benchmark</span>
+                                <span class="font-mono text-[10px] text-[#e6edf3] font-semibold">Fixed 30s/30s Un-Adaptive</span>
+                            </div>
+                            <div class="flex justify-between items-center pb-2 border-b border-[#21262d]">
+                                <span class="text-[#8b949e]">Hypothetical Fixed Delay</span>
+                                <span id="cf-baseline-delay" class="font-mono text-[#EF4444] font-bold">--s</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-[#8b949e]">AURA Adaptive Advantage</span>
+                                <span id="cf-aura-savings" class="font-mono text-[#10B981] font-bold bg-[#10B981]/10 px-2 py-0.5 rounded border border-[#10B981]/30">--% Less Delay</span>
                             </div>
                         </div>
                     </div>

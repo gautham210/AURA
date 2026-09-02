@@ -17,7 +17,7 @@ class DemoTrafficController {
             routeGeometry: [],
             totalDistance: 0,
             distanceTraveled: 0,
-            speed: 15, // m/s for ambulance
+            speed: 15, // m/s for ambulance (~54 km/h)
             currentJunctionTarget: null,
             junctionsRemaining: []
         };
@@ -38,7 +38,10 @@ class DemoTrafficController {
     
     pause() {
         this.active = false;
-        if (this.timerInterval) clearInterval(this.timerInterval);
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+            this.timerInterval = null;
+        }
         console.log("DEMO SIMULATION PAUSED");
     }
     
@@ -64,6 +67,7 @@ class DemoTrafficController {
             if (this.trafficEngine.state[j.id]) {
                 for(const app in this.trafficEngine.state[j.id].approaches) {
                     this.trafficEngine.state[j.id].approaches[app].q = 0;
+                    this.trafficEngine.state[j.id].approaches[app].max_q = 0;
                 }
             }
         });
@@ -76,28 +80,30 @@ class DemoTrafficController {
         this.elapsedSeconds++;
         const t = this.elapsedSeconds;
         
-        // --- 1. DEMAND GENERATION (happens in getSimulatedArrivals) ---
-        
-        // --- 2. EMERGENCY TRIGGER (T=35s) ---
-        if (t === 35) {
+        // Emergency Trigger at T=35s during full demo
+        if (t === 35 && !this.emergency.active) {
             this.triggerEmergency();
         }
         
-        // --- 3. EMERGENCY TRAVEL ---
+        // Process Emergency Movement
         if (this.emergency.active) {
             this.processEmergencyMovement();
         }
     }
     
-    // Will be called by server.js in its loop
     getSimulatedArrivals() {
         const arrivalsMap = {};
         const t = this.elapsedSeconds;
         if (!this.active) return arrivalsMap;
 
+        // Structured congestion surge
+        // T=0..10: Normal equilibrium (low demand)
+        // T=11..35: Surge on arterial junctions J2, J3, J4
+        // T=36..60: Moderating demand during emergency passage
+        // T>60: Recovery to normal flow
         let baseDemand = 0;
         if (t >= 0 && t <= 10) baseDemand = 1;
-        else if (t > 10 && t <= 60) baseDemand = 3;
+        else if (t > 10 && t <= 45) baseDemand = 2;
         else baseDemand = 1;
 
         this.graph.controlledJunctions.forEach(j => {
@@ -108,8 +114,13 @@ class DemoTrafficController {
             for (const phase of junctionState.phases) {
                 for (const app of phase) {
                     let count = 0;
-                    if (Math.random() < 0.7) count = Math.floor(Math.random() * baseDemand) + (baseDemand > 1 ? 1 : 0);
-                    if (t > 10 && t <= 35 && (j.id === 'J2' || j.id === 'J3' || j.id === 'J4')) count = 3;
+                    if (Math.random() < 0.25) {
+                        count = Math.floor(Math.random() * baseDemand) + 1;
+                    }
+                    // Deliberate bottleneck surge on Palarivattom/Kaloor during surge phase
+                    if (t > 10 && t <= 35 && (j.id === 'J2' || j.id === 'J3') && (app === 'NORTHBOUND' || app === 'SOUTHBOUND')) {
+                        count = 2;
+                    }
                     
                     arrivalsMap[j.id][app] = { counts: { car: count } };
                 }
@@ -118,12 +129,22 @@ class DemoTrafficController {
         return arrivalsMap;
     }
     
-    triggerEmergency() {
+    triggerEmergency(customOrigin) {
         console.log("TRIGGERING EMERGENCY SIMULATION");
         
-        // Pick a random drivable origin (we will just pick a random graph node that is NOT a hospital)
-        const possibleOrigins = this.graph.nodes.filter(n => n.id !== "277170472" && !this.graph.pois.find(p => p.nearestNode === n.id));
-        const originNode = possibleOrigins[Math.floor(Math.random() * possibleOrigins.length)];
+        let originNode = null;
+        if (customOrigin && customOrigin.lat && customOrigin.lng) {
+            const nearest = this.routingEngine.findNearestEdge(customOrigin.lat, customOrigin.lng);
+            if (nearest && nearest.edge) {
+                originNode = this.graph.nodes.find(n => n.id === nearest.edge.to);
+            }
+        }
+        
+        if (!originNode) {
+            // Pick a realistic origin inside the Kochi road network
+            const possibleOrigins = this.graph.nodes.filter(n => n.id !== "277170472" && !this.graph.pois.find(p => p.nearestNode === n.id));
+            originNode = possibleOrigins[Math.floor(Math.random() * possibleOrigins.length)];
+        }
         
         const hospitals = this.graph.pois.filter(p => p.type === 'hospital' || p.type === 'clinic');
         
@@ -132,9 +153,7 @@ class DemoTrafficController {
         let shortestDist = Infinity;
         let bestRoute = null;
         
-        // We just use Dijkstra without network state for finding the closest structurally
         const emptyState = [];
-        
         hospitals.forEach(h => {
             const destNode = h.nearestNode;
             if (!destNode) return;
@@ -160,6 +179,18 @@ class DemoTrafficController {
             junctionsRemaining: [...bestRoute.controlledJunctionsPassed] // { id, name }
         };
         
+        // If timer is not running, start standalone emergency movement timer
+        if (!this.timerInterval) {
+            this.timerInterval = setInterval(() => {
+                if (this.emergency.active) {
+                    this.processEmergencyMovement();
+                } else if (!this.active) {
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = null;
+                }
+            }, 1000);
+        }
+        
         // Broadcast start
         if (this.onEmergencyUpdate) {
             this.onEmergencyUpdate({
@@ -167,7 +198,8 @@ class DemoTrafficController {
                 hospital: bestHospital.name,
                 distanceRemaining: bestRoute.distance,
                 geometry: bestRoute.geometry,
-                currentPos: bestRoute.geometry.length > 0 ? bestRoute.geometry[0] : [originNode.lat, originNode.lng]
+                currentPos: bestRoute.geometry.length > 0 ? bestRoute.geometry[0] : [originNode.lat, originNode.lng],
+                junctionsRemaining: this.emergency.junctionsRemaining.length
             });
         }
     }
@@ -189,7 +221,6 @@ class DemoTrafficController {
         let currentPos = null;
         let distAccum = 0;
         
-        // Helper to get distance between two points
         const dist2D = (p1, p2) => {
             const R = 6371000;
             const dLat = (p2[0]-p1[0])*Math.PI/180;
@@ -203,7 +234,7 @@ class DemoTrafficController {
             const p2 = em.routeGeometry[i+1];
             const segmentDist = dist2D(p1, p2);
             if (distAccum + segmentDist >= em.distanceTraveled) {
-                const ratio = (em.distanceTraveled - distAccum) / segmentDist;
+                const ratio = (em.distanceTraveled - distAccum) / (segmentDist || 1);
                 currentPos = [
                     p1[0] + (p2[0] - p1[0]) * ratio,
                     p1[1] + (p2[1] - p1[1]) * ratio
@@ -221,10 +252,10 @@ class DemoTrafficController {
         if (em.junctionsRemaining.length > 0) {
             const nextJunc = em.junctionsRemaining[0];
             const jData = this.graph.controlledJunctions.find(j => j.id === nextJunc.id);
-            if (jData) {
+            if (jData && currentPos) {
                 const distToJunc = dist2D(currentPos, [jData.lat, jData.lng]);
                 
-                if (distToJunc < 250) { // Approaching junction
+                if (distToJunc < 250) { // Approaching junction: trigger CLEARING -> EMERGENCY_GREEN
                     const rNodes = em.route.route;
                     const jIdx = rNodes.findIndex(nid => nid === jData.osmNodeId || nid === jData.id);
                     let approachDir = "NORTHBOUND"; 
@@ -241,7 +272,7 @@ class DemoTrafficController {
                 
                 if (distToJunc < 30) {
                     em.junctionsRemaining.shift();
-                    this.trafficEngine.setEmergencyPreemption(jData.id, null); 
+                    this.trafficEngine.setEmergencyPreemption(jData.id, null); // Transitions to RECOVERY -> NORMAL
                 }
             }
         }
@@ -251,7 +282,7 @@ class DemoTrafficController {
             this.onEmergencyUpdate({
                 active: true,
                 hospital: em.hospital,
-                distanceRemaining: em.totalDistance - em.distanceTraveled,
+                distanceRemaining: Math.max(0, em.totalDistance - em.distanceTraveled),
                 currentPos: currentPos,
                 junctionsRemaining: em.junctionsRemaining.length
             });
