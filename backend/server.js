@@ -50,7 +50,9 @@ let latestVisionTelemetry = {
     junction_id: null,
     approach_direction: null,
     detections: {},
-    pcu: 0,
+    arrival_pcu: 0,
+    scene_pcu: 0,
+    tracked_count: 0,
     source_mode: "SIMULATED",
     lastSeen: 0
 };
@@ -60,7 +62,7 @@ app.post('/vision-update', (req, res) => {
     if (!req.body || !req.body.data) {
         return res.status(400).json({ error: "Missing data payload" });
     }
-    const { junction_id, approach_direction, detections, calculated_pcu, source_mode } = req.body.data;
+    const { junction_id, approach_direction, detections, calculated_pcu, scene_pcu, tracked_count, source_mode } = req.body.data;
     const mode = source_mode || "REPLAY";
     sensor.injectVisionData(junction_id, approach_direction, { counts: detections || {} }, mode);
 
@@ -74,12 +76,21 @@ app.post('/vision-update', (req, res) => {
         junction_id: junction_id,
         approach_direction: approach_direction,
         detections: detections || {},
-        pcu: +(Number(pcu || 0).toFixed(1)),
+        arrival_pcu: +(Number(pcu || 0).toFixed(1)),
+        scene_pcu: scene_pcu !== undefined ? +(Number(scene_pcu).toFixed(1)) : +(Number(pcu || 0).toFixed(1)),
+        tracked_count: tracked_count || 0,
         source_mode: mode,
         lastSeen: Date.now()
     };
 
-    res.json({ status: 'ok', junction_id, approach_direction, source_mode: mode, pcu: latestVisionTelemetry.pcu });
+    res.json({ 
+        status: 'ok', 
+        junction_id, 
+        approach_direction, 
+        source_mode: mode, 
+        arrival_pcu: latestVisionTelemetry.arrival_pcu,
+        scene_pcu: latestVisionTelemetry.scene_pcu 
+    });
 });
 
 let connectedClients = new Set();
@@ -233,7 +244,9 @@ setInterval(() => {
         junction_id: isVisionActive ? latestVisionTelemetry.junction_id : null,
         approach_direction: isVisionActive ? latestVisionTelemetry.approach_direction : null,
         source_mode: isVisionActive ? latestVisionTelemetry.source_mode : "SIMULATED",
-        pcu: isVisionActive ? latestVisionTelemetry.pcu : 0,
+        arrival_pcu: isVisionActive ? latestVisionTelemetry.arrival_pcu : 0,
+        scene_pcu: isVisionActive ? latestVisionTelemetry.scene_pcu : 0,
+        tracked_count: isVisionActive ? latestVisionTelemetry.tracked_count : 0,
         detections: isVisionActive ? latestVisionTelemetry.detections : {},
         lastSeen: latestVisionTelemetry.lastSeen
     };

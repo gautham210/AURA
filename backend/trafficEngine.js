@@ -30,9 +30,9 @@ class TrafficEngine {
                 auto_rickshaw: 1.0,
                 car: 1.0,
                 bus: 3.0,
-                'Two-wheeler': 0.5, 'bicycle': 0.5, 'Three-wheeler': 0.5,
-                'Hatchback': 1.0, 'Sedan': 1.0, 'SUV': 1.0, 'Van': 1.0, 'Others': 1.0,
-                'MUV': 3.0, 'Bus': 3.0, 'Truck': 3.0, 'LCV': 3.0, 'Mini-bus': 3.0, 'tempo-traveller': 3.0
+                'Two-wheeler': 0.5, 'bicycle': 0.5, 'Three-wheeler': 1.0,
+                'Hatchback': 1.0, 'Sedan': 1.0, 'SUV': 1.0, 'Van': 1.0, 'Others': 1.0, 'LCV': 1.0,
+                'MUV': 3.0, 'Bus': 3.0, 'Truck': 3.0, 'Mini-bus': 3.0, 'tempo-traveller': 3.0
             }
         };
 

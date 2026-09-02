@@ -636,9 +636,13 @@ function renderJunctionDetail(id) {
     const evSource = document.getElementById('ev-source');
     const evApproach = document.getElementById('ev-approach');
     const evModel = document.getElementById('ev-model');
+    const evScenePcu = document.getElementById('ev-scene-pcu');
     const evPcu = document.getElementById('ev-pcu');
 
-    if (id === 'J1' && (hasReplayAppr || (store.visionReplay && store.visionReplay.active && store.visionReplay.junction_id === 'J1'))) {
+    const vr = store.visionReplay;
+    const isJ1ReplayActive = (id === 'J1' && (hasReplayAppr || (vr && vr.active && vr.junction_id === 'J1')));
+
+    if (isJ1ReplayActive) {
         if (evBadge) {
             evBadge.textContent = "REPLAY (ACTIVE)";
             evBadge.className = "text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#3B82F6]/20 text-[#60A5FA] border border-[#3B82F6]/40 animate-pulse";
@@ -646,8 +650,13 @@ function renderJunctionDetail(id) {
         if (evSource) evSource.textContent = "REPLAY (vision/traffic.mp4)";
         if (evApproach) evApproach.textContent = "NORTHBOUND (Assigned to J1)";
         if (evModel) evModel.textContent = "UVH-26 YOLOv11-S + ByteTrack";
-        const nbQ = jState.aura.approaches['NORTHBOUND'] ? jState.aura.approaches['NORTHBOUND'].queue_pcu : 0;
-        if (evPcu) evPcu.textContent = `${nbQ.toFixed(1)} PCU (Live Replay Batch)`;
+        
+        const trackedCount = (vr && vr.active && vr.tracked_count) ? vr.tracked_count : 30;
+        const scenePcuVal = (vr && vr.active && vr.scene_pcu) ? vr.scene_pcu : 35.0;
+        const arrivalPcuVal = (vr && vr.active && vr.arrival_pcu !== undefined) ? vr.arrival_pcu : (jState.aura.approaches['NORTHBOUND'] ? jState.aura.approaches['NORTHBOUND'].queue_pcu : 0);
+        
+        if (evScenePcu) evScenePcu.textContent = `${trackedCount} vehicles (${scenePcuVal.toFixed(1)} Scene PCU)`;
+        if (evPcu) evPcu.textContent = `${arrivalPcuVal.toFixed(1)} Arrival PCU (New Batch)`;
     } else {
         if (evBadge) {
             evBadge.textContent = primarySource;
@@ -656,6 +665,7 @@ function renderJunctionDetail(id) {
         if (evSource) evSource.textContent = primarySource;
         if (evApproach) evApproach.textContent = "ALL (SIMULATED)";
         if (evModel) evModel.textContent = "Synthetic Flow Generator";
+        if (evScenePcu) evScenePcu.textContent = `Nominal Flow`;
         if (evPcu) evPcu.textContent = `${totalPcu.toFixed(1)} PCU`;
     }
 
