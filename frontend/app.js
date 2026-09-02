@@ -132,4 +132,61 @@ ws.onmessage = (event) => {
             }
         });
     }
+
+    if (msg.event === "ROUTE_RESULT") {
+        const resDiv = document.getElementById('route-results');
+        const d = msg.data;
+        
+        resDiv.innerHTML = `
+            <div style="background:#333; padding:10px; margin-bottom:10px; border-radius:4px;">
+                <h4 style="margin-top:0;color:#f44336;">Individual Fastest Route</h4>
+                <p style="margin:5px 0;">Path: ${d.individual.route.join(' &rarr; ')}</p>
+                <p style="margin:5px 0;">Distance: ${d.individual.distance}m</p>
+                <p style="margin:5px 0;">Est. Time: ${Math.round(d.individual.estimatedTime)}s</p>
+                <p style="margin:5px 0;">Max Congestion: ${Math.round(d.individual.congestionExposure*100)}%</p>
+                <p style="color:#aaa; font-size:0.9em;"><i>${d.individual.explanation}</i></p>
+            </div>
+            <div style="background:#1b3b24; border:1px solid #4CAF50; padding:10px; border-radius:4px;">
+                <h4 style="margin-top:0;color:#4CAF50;">AURA Cooperative Route</h4>
+                <p style="margin:5px 0;">Path: ${d.aura.route.join(' &rarr; ')}</p>
+                <p style="margin:5px 0;">Distance: ${d.aura.distance}m</p>
+                <p style="margin:5px 0;">Est. Time: ${Math.round(d.aura.estimatedTime)}s</p>
+                <p style="margin:5px 0;">Max Congestion: ${Math.round(d.aura.congestionExposure*100)}%</p>
+                <p style="color:#81c784; font-size:0.9em;"><b>${d.aura.explanation}</b></p>
+            </div>
+        `;
+
+        // Clear old lines
+        if (window.routePolylines) {
+            window.routePolylines.forEach(p => map.removeLayer(p));
+        }
+        window.routePolylines = [];
+
+        function drawPath(pathNodes, color, weight, dashArray, offsetLat, offsetLng) {
+            let latlngs = pathNodes.map(id => {
+                let ll = markers[id].getLatLng();
+                return [ll.lat + offsetLat, ll.lng + offsetLng];
+            });
+            let polyline = L.polyline(latlngs, {
+                color: color,
+                weight: weight,
+                dashArray: dashArray,
+                opacity: 0.8
+            }).addTo(map);
+            window.routePolylines.push(polyline);
+        }
+        
+        // Offset individual route slightly so it doesn't overlap perfectly with AURA route
+        drawPath(d.individual.route, '#f44336', 4, '10, 10', 0.0005, 0);
+        drawPath(d.aura.route, '#4CAF50', 6, null, -0.0005, 0);
+    }
 };
+
+function requestRoute() {
+    const origin = document.getElementById('route-origin').value;
+    const dest = document.getElementById('route-dest').value;
+    ws.send(JSON.stringify({
+        event: "ROUTE_REQUEST",
+        data: { origin, destination: dest }
+    }));
+}

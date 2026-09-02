@@ -6,6 +6,7 @@ const path = require('path');
 const cors = require('cors');
 const { SimulationSensor, HybridSensor } = require('./trafficSensors');
 const { TrafficEngine, BaselineController } = require('./trafficEngine');
+const { RoutingEngine } = require('./routingEngine');
 
 const app = express();
 app.use(cors());
@@ -29,6 +30,9 @@ const phases = [["NORTHBOUND", "SOUTHBOUND"], ["EASTBOUND", "WESTBOUND"]];
 const engineConfig = { C: 60, lost_time: 6, G_min: 10, gap_out_seconds: 5, S: 0.5 };
 const aura = new TrafficEngine(engineConfig);
 const baseline = new BaselineController(engineConfig);
+const routingEngine = new RoutingEngine(graph);
+
+let latestNetworkState = [];
 
 junctionIds.forEach(jid => {
     aura.initJunction(jid, phases);
@@ -38,12 +42,7 @@ junctionIds.forEach(jid => {
 // Vision endpoint
 app.post('/vision-update', (req, res) => {
     const { junction_id, approach_direction, detections, calculated_pcu, source_mode } = req.body.data;
-    
-    // Convert new arrivals into "counts" format that calculatePCU expects, or just inject direct PCU?
-    // The sensor interface expects 'counts'.
-    // If tracking gives us new arrivals, we can inject those directly.
     sensor.injectVisionData(junction_id, approach_direction, { counts: detections }, source_mode || "LIVE");
-    
     res.json({ status: 'ok' });
 });
 
@@ -75,6 +74,24 @@ function getGreenWaveStates() {
 wss.on('connection', (ws) => {
     console.log("Client connected");
     connectedClients.add(ws);
+    
+    ws.on('message', (message) => {
+        try {
+            const payload = JSON.parse(message);
+            if (payload.event === "ROUTE_REQUEST") {
+                const routeResult = routingEngine.findRoutes(payload.data.origin, payload.data.destination, latestNetworkState);
+                if (routeResult) {
+                    ws.send(JSON.stringify({
+                        event: "ROUTE_RESULT",
+                        timestamp: new Date().toISOString(),
+                        data: routeResult
+                    }));
+                }
+            }
+        } catch (e) {
+            console.error("WS error", e);
+        }
+    });
 
     ws.send(JSON.stringify({
         event: "GRAPH_DATA",
@@ -132,6 +149,8 @@ setInterval(() => {
             baseline: baselineState
         };
     });
+
+    latestNetworkState = junctionsState;
 
     const payload = {
         event: "SIMULATED_TRAFFIC_STATE",
