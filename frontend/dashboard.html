@@ -96,9 +96,20 @@
         }
     </script>
 <style>
-        .map-grid { background-size: 40px 40px; background-image: linear-gradient(to right, #32353c 1px, transparent 1px), linear-gradient(to bottom, #32353c 1px, transparent 1px); }
         .pulsing-border { animation: pulseBorder 2s infinite; }
         @keyframes pulseBorder { 0% { border-color: #4edea3; box-shadow: 0 0 0 0 rgba(78, 222, 163, 0.4); } 70% { border-color: transparent; box-shadow: 0 0 0 4px rgba(78, 222, 163, 0); } 100% { border-color: #4edea3; box-shadow: 0 0 0 0 rgba(78, 222, 163, 0); } }
+        .junction-tooltip {
+            background: rgba(16, 19, 26, 0.9);
+            border: 1px solid #424754;
+            color: #e1e2ec;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 2px 6px;
+            border-radius: 3px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+        .junction-tooltip::before { border-top-color: rgba(16, 19, 26, 0.9) !important; }
     </style>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
@@ -125,7 +136,7 @@
 <div class="flex items-center gap-4 border-r border-outline-variant pr-4">
 <div class="flex flex-col items-end">
 <span class="text-label-caps font-label-caps text-on-surface-variant">DATA</span>
-<span class="text-data-mono font-data-mono text-on-surface">Live</span>
+<span id="data-source" class="text-data-mono font-data-mono text-on-surface-variant">SIMULATED</span>
 </div>
 <div class="flex flex-col items-end">
 <span class="text-label-caps font-label-caps text-on-surface-variant">CONNECTION</span>
@@ -162,8 +173,8 @@
 <div class="p-4 border-b border-outline-variant flex gap-3 items-center">
 <img alt="System Status Indicator" class="w-10 h-10 rounded-full object-cover border border-outline-variant" data-alt="A highly detailed circular status indicator showing a complex geometric pattern radiating outward in vivid green against a dark background, representing an active system state. The style is modern, technical, and precise, emitting a subtle digital glow. High contrast, sharp edges." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWAnSWuBTlGXWbSZTcOrjU2pSSSm9AIh4QFvj1G8gScHRBs8sQhC5WG8JuN-L98MwteTcObe40tuyD8RoePlKP2c43mmyYgszNPeHB-uG_ZVHuORV4hCHgYpcPzWFyyE3wnwT7RE_rvIy9Sukrr2LDoR1kd48VtF741E9o8MwPqlkw_cFgN2kvIY-OXDuPcwXCYlOrPcEGCJK42p_nkLe1xEkhMgrZ591kiDwpyJ3yts0oJ_1TUfnM"/>
 <div>
-<h2 class="text-body-md font-body-md font-bold text-on-surface">System Online</h2>
-<p class="text-label-caps font-label-caps text-on-surface-variant">Live Data Stream</p>
+<h2 id="sidebar-system-status" class="text-body-md font-body-md font-bold text-on-surface">System Online</h2>
+<p id="sidebar-data-label" class="text-label-caps font-label-caps text-on-surface-variant">Simulated Data</p>
 </div>
 </div>
 <div id="junctions-list" class="flex-1 py-4 flex flex-col gap-2 overflow-y-auto px-2"></div>
@@ -209,10 +220,9 @@
 <!-- Content Area (Map + Panel) -->
 <div class="flex flex-1 overflow-hidden relative">
 <!-- Map Area -->
-<div class="flex-1 relative bg-surface-container-lowest map-grid overflow-hidden border-r border-outline-variant" data-location="Kochi" style="">
+<div class="flex-1 relative bg-surface-container-lowest overflow-hidden border-r border-outline-variant" data-location="Kochi">
 <div id="map" class="w-full h-full z-10 absolute inset-0"></div>
-<!-- SVG removed -->
-
+</div>
 <!-- Right Drawer -->
 <div class="w-[340px] bg-surface flex flex-col shrink-0 overflow-y-auto z-20">
     <div class="p-4 border-b border-outline-variant flex flex-col bg-surface-container-low">
