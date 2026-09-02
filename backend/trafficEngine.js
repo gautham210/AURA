@@ -24,7 +24,7 @@ class TrafficEngine {
             lost_time: config.lost_time || 6,
             G_min: config.G_min || 10,
             gap_out_seconds: config.gap_out_seconds || 5,
-            S: config.S || 0.5,
+            S: config.S || 0.8, // 0.8 PCU/s discharge rate (~2880 PCU/h multi-lane capacity)
             PCU_WEIGHTS: {
                 two_wheeler: 0.5,
                 auto_rickshaw: 1.0,
@@ -54,6 +54,7 @@ class TrafficEngine {
             phaseDurations: [30, 30],
             approaches: {},
             downstreamUtilization: 0,
+            downstreamSpillbackActive: false,
             backPressureMultiplier: 1.0,
             backPressureLevel: 0, 
             spillbackEvents: 0,
@@ -70,6 +71,9 @@ class TrafficEngine {
                 this.state[junctionId].approaches[approach] = {
                     q: 0,
                     max_q: 0,
+                    storageCapacity: 12.0, // Physical storage capacity in PCU
+                    spillbackActive: false,
+                    spillbackEvents: 0,
                     totalAccumulatedDelay: 0,
                     totalVehiclesArrived: 0,
                     emptySeconds: 0, // for gap-out
@@ -127,37 +131,57 @@ class TrafficEngine {
         junction.downstreamUtilization = downstreamUtilization;
         const newLevel = this.getBackPressureLevel(downstreamUtilization);
         
-        if (newLevel > junction.backPressureLevel) {
+        // Spillback event transition semantics: rising-edge trigger on saturation threshold
+        const isSaturated = (downstreamUtilization >= 0.90);
+        if (!junction.downstreamSpillbackActive && isSaturated) {
             junction.spillbackEvents += 1;
         }
+        junction.downstreamSpillbackActive = isSaturated;
         junction.backPressureLevel = newLevel;
         junction.backPressureMultiplier = this.getBackPressureMultiplier(downstreamUtilization);
     }
 
-    setEmergencyPreemption(junctionId, approach) {
+    setEmergencyPreemption(junctionId, approach, bufferTicks) {
         const junction = this.state[junctionId];
         if (!junction) return;
 
         if (approach) {
-            // Activate: Enter CLEARING for safety clearance (3 ticks), then transition to EMERGENCY_GREEN
             junction.emergency.active = true;
             junction.emergency.approach = approach;
-            junction.emergency.state = 'CLEARING';
-            junction.emergency.timer = 3;
-            // Immediate safety clearing: all signals RED
-            for (const phase of junction.phases) {
-                for (const app of phase) {
-                    junction.approaches[app].signalState = "RED";
+            if (bufferTicks === 0) {
+                junction.emergency.state = 'EMERGENCY_GREEN';
+                junction.emergency.timer = 0;
+                for (const phase of junction.phases) {
+                    for (const app of phase) {
+                        junction.approaches[app].signalState = (app === approach) ? "GREEN" : "RED";
+                    }
                 }
-            }
-        } else {
-            // Deactivate: Enter RECOVERY for clearance (2 ticks), then return to NORMAL
-            if (junction.emergency.active) {
-                junction.emergency.state = 'RECOVERY';
-                junction.emergency.timer = 2;
+            } else {
+                // Activate: Enter CLEARING for safety clearance (bufferTicks, default 3), then transition to EMERGENCY_GREEN
+                junction.emergency.state = 'CLEARING';
+                junction.emergency.timer = bufferTicks !== undefined ? bufferTicks : 3;
+                // Immediate safety clearing: all signals RED
                 for (const phase of junction.phases) {
                     for (const app of phase) {
                         junction.approaches[app].signalState = "RED";
+                    }
+                }
+            }
+        } else {
+            if (junction.emergency.active) {
+                if (bufferTicks === 0) {
+                    junction.emergency.active = false;
+                    junction.emergency.approach = null;
+                    junction.emergency.state = 'NORMAL';
+                    junction.emergency.timer = 0;
+                } else {
+                    // Deactivate: Enter RECOVERY for clearance (bufferTicks, default 2), then return to NORMAL
+                    junction.emergency.state = 'RECOVERY';
+                    junction.emergency.timer = bufferTicks !== undefined ? bufferTicks : 2;
+                    for (const phase of junction.phases) {
+                        for (const app of phase) {
+                            junction.approaches[app].signalState = "RED";
+                        }
                     }
                 }
             } else {
@@ -315,6 +339,14 @@ class TrafficEngine {
                 
                 approachState.totalVehiclesArrived += lambda;
                 approachState.totalAccumulatedDelay += approachState.q * 1; // Delay = queue length (PCU) * 1s
+
+                // Rising-edge physical spillback evaluation on storage capacity
+                const isSpillback = (approachState.q >= approachState.storageCapacity);
+                if (!approachState.spillbackActive && isSpillback) {
+                    approachState.spillbackEvents += 1;
+                    junction.spillbackEvents += 1;
+                }
+                approachState.spillbackActive = isSpillback;
             }
         }
     }
@@ -336,6 +368,8 @@ class TrafficEngine {
             "RECOVERY": "Post-Emergency Recovery Clearance"
         };
 
+        const anySpillbackActive = Object.values(junction.approaches).some(a => a.spillbackActive) || !!junction.downstreamSpillbackActive;
+
         let state = {
             junction_id: junctionId,
             phase_name: activePhaseName,
@@ -348,6 +382,7 @@ class TrafficEngine {
             phase_time_remaining: junction.phaseTimeRemaining,
             back_pressure_multiplier: +(junction.backPressureMultiplier.toFixed(2)),
             spillback_events: junction.spillbackEvents,
+            spillback_active: anySpillbackActive,
             emergency: {
                 active: junction.emergency.active,
                 state: junction.emergency.state,
@@ -365,6 +400,8 @@ class TrafficEngine {
                     queue_pcu: +(aState.q.toFixed(2)),
                     max_queue_pcu: +(aState.max_q.toFixed(2)),
                     avg_delay_seconds: +(avgDelay.toFixed(1)),
+                    spillback_active: aState.spillbackActive,
+                    spillback_events: aState.spillbackEvents,
                     source_mode: aState.source_mode || "SIMULATED"
                 };
             }

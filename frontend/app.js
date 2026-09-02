@@ -50,32 +50,9 @@ class AuraStateStore {
             renderJunctionDetail(this.selectedJunctionId);
         }
         
-        // Update Demo Running Status Indicator
-        const demoState = stateData.demo_state;
-        const demoIndicator = document.getElementById('demo-status-indicator');
-        const demoElapsed = document.getElementById('demo-elapsed');
-        const demoPhaseLabel = document.getElementById('demo-phase-label');
-        if (demoIndicator && demoState) {
-            if (demoState.active) {
-                demoIndicator.classList.remove('hidden');
-                demoIndicator.classList.add('flex');
-                if (demoElapsed) demoElapsed.textContent = `T+${demoState.elapsed}s`;
-                if (demoPhaseLabel) {
-                    demoPhaseLabel.textContent = demoState.phase;
-                    // Color-code phase
-                    const phaseColors = {
-                        'WARM-UP': '#10B981',
-                        'PEAK SURGE': '#EF4444',
-                        'MODERATION': '#F59E0B',
-                        'RECOVERY': '#3B82F6'
-                    };
-                    demoPhaseLabel.style.color = phaseColors[demoState.phase] || '#F59E0B';
-                }
-            } else {
-                demoIndicator.classList.add('hidden');
-                demoIndicator.classList.remove('flex');
-            }
-        }
+        // Update Demo Operations Console & Status Badges
+        this.latestDemoState = stateData.demo_state;
+        updateDemoOperationsConsole(this.latestDemoState);
     }
 }
 
@@ -134,6 +111,12 @@ function switchMode(mode) {
         // Restore admin controls
         if (adminControls) adminControls.classList.remove('hidden');
         
+        // Restore Demo Operations Console if demo is running or completed
+        const demoConsole = document.getElementById('demo-console');
+        if (demoConsole && store.latestDemoState && (store.latestDemoState.active || store.latestDemoState.completed)) {
+            demoConsole.classList.remove('hidden');
+        }
+        
         // Show Control Room Layers
         if (corridorLayer && map && !map.hasLayer(corridorLayer)) map.addLayer(corridorLayer);
         if (poiLayer && map && !map.hasLayer(poiLayer)) map.addLayer(poiLayer);
@@ -156,8 +139,10 @@ function switchMode(mode) {
         const topMetrics = document.getElementById('top-metrics');
         if (topMetrics) topMetrics.classList.add('hidden');
         
-        // Hide admin controls in User View
+        // Hide admin controls and Demo Operations Console in User View
         if (adminControls) adminControls.classList.add('hidden');
+        const demoConsole = document.getElementById('demo-console');
+        if (demoConsole) demoConsole.classList.add('hidden');
         
         if (drawerControl) drawerControl.classList.add('translate-x-full');
         highlightMarker(null);
@@ -483,7 +468,7 @@ function updateTopMetrics(networkState) {
     
     let totalDelay = 0;
     let delayCount = 0;
-    let maxDemand = 0;
+    let maxQueue = 0;
     let totalSpillbacks = 0;
 
     networkState.forEach(j => {
@@ -496,8 +481,8 @@ function updateTopMetrics(networkState) {
                     totalDelay += app.avg_delay_seconds;
                     delayCount++;
                 }
-                if (app.queue_pcu > maxDemand) {
-                    maxDemand = app.queue_pcu;
+                if (app.queue_pcu > maxQueue) {
+                    maxQueue = app.queue_pcu;
                 }
             });
         }
@@ -506,11 +491,11 @@ function updateTopMetrics(networkState) {
     const avgDelay = delayCount > 0 ? (totalDelay / delayCount).toFixed(1) : "0.0";
     
     const metricDelay = document.getElementById('metric-delay');
-    const metricDemand = document.getElementById('metric-demand');
+    const metricQueue = document.getElementById('metric-queue') || document.getElementById('metric-demand');
     const metricSpillbacks = document.getElementById('metric-spillbacks');
 
     if (metricDelay) metricDelay.textContent = `${avgDelay}s`;
-    if (metricDemand) metricDemand.textContent = `${maxDemand.toFixed(1)} PCU`;
+    if (metricQueue) metricQueue.textContent = `${maxQueue.toFixed(1)} PCU`;
     if (metricSpillbacks) metricSpillbacks.textContent = totalSpillbacks;
 }
 
@@ -898,18 +883,22 @@ function handleEmergencyUpdate(data) {
 
             // Draw route geometry if available and not yet drawn
             if (data.geometry && data.geometry.length > 1 && !emergencyPolyline) {
-                emergencyPolyline = L.polyline(data.geometry, {
+                // Dominant Red Outer Glow Halo
+                emergencyGlowPolyline = L.polyline(data.geometry, {
                     color: '#EF4444',
-                    weight: 6,
-                    opacity: 0.95,
-                    lineCap: 'round'
+                    weight: 14,
+                    opacity: 0.45,
+                    lineCap: 'round',
+                    lineJoin: 'round'
                 }).addTo(emergencyLayer);
 
-                emergencyGlowPolyline = L.polyline(data.geometry, {
-                    color: '#3B82F6',
-                    weight: 12,
-                    opacity: 0.45,
-                    lineCap: 'round'
+                // High-Contrast Crisp Laser Line
+                emergencyPolyline = L.polyline(data.geometry, {
+                    color: '#FCA5A5',
+                    weight: 5,
+                    opacity: 1.0,
+                    lineCap: 'round',
+                    lineJoin: 'round'
                 }).addTo(emergencyLayer);
             }
 
@@ -919,12 +908,12 @@ function handleEmergencyUpdate(data) {
                     const emIcon = L.divIcon({
                         className: 'emergency-custom-marker',
                         html: `
-                            <div class="relative flex items-center justify-center w-8 h-8 rounded-full bg-[#EF4444] border-2 border-white shadow-2xl emergency-siren">
+                            <div class="relative flex items-center justify-center w-9 h-9 rounded-full bg-[#EF4444] border-2 border-white shadow-[0_0_20px_#EF4444] animate-pulse">
                                 <span class="text-sm">🚑</span>
                             </div>
                         `,
-                        iconSize: [32, 32],
-                        iconAnchor: [16, 16]
+                        iconSize: [36, 36],
+                        iconAnchor: [18, 18]
                     });
                     emergencyMarker = L.marker(data.currentPos, { icon: emIcon }).addTo(emergencyLayer);
                 } else {
@@ -949,13 +938,142 @@ function handleEmergencyUpdate(data) {
 }
 
 // -------------------------------------------------------------
+// Demo Operations Console & Telemetry Renderer
+// -------------------------------------------------------------
+function getPhaseColor(phase) {
+    const colors = {
+        'TRAFFIC BUILDUP': '#F59E0B',
+        'EMERGENCY DETECTED': '#EF4444',
+        'CLEARING J3': '#EF4444',
+        'EMERGENCY GREEN J3': '#10B981',
+        'GREEN WAVE → J4': '#10B981',
+        'CORRIDOR TRANSIT': '#3B82F6',
+        'GREEN WAVE → J5': '#10B981',
+        'GREEN WAVE → J6': '#10B981',
+        'EMERGENCY PASSED': '#3B82F6',
+        'RECOVERY': '#F59E0B',
+        'DEMO COMPLETE': '#10B981'
+    };
+    return colors[phase] || '#F59E0B';
+}
+
+function updateDemoOperationsConsole(demoState) {
+    const consoleEl = document.getElementById('demo-console');
+    const timerEl = document.getElementById('demo-console-timer');
+    const phaseEl = document.getElementById('demo-console-phase');
+    const eventsEl = document.getElementById('demo-console-events');
+    const summaryEl = document.getElementById('demo-console-summary');
+    const pulseEl = document.getElementById('demo-console-pulse');
+
+    const demoIndicator = document.getElementById('demo-status-indicator');
+    const demoStatusText = document.getElementById('demo-status-text');
+    const demoElapsed = document.getElementById('demo-elapsed');
+    const demoPhaseLabel = document.getElementById('demo-phase-label');
+
+    if (!demoState) return;
+
+    const isRunning = demoState.active;
+    const isCompleted = demoState.completed;
+
+    // Header strip indicator
+    if (demoIndicator) {
+        if (isRunning || isCompleted) {
+            demoIndicator.classList.remove('hidden');
+            demoIndicator.classList.add('flex');
+            if (demoStatusText) {
+                demoStatusText.textContent = isCompleted ? "DEMO COMPLETE" : "DEMO RUNNING";
+                demoStatusText.className = isCompleted 
+                    ? "text-[10px] font-mono font-bold text-[#60A5FA] tracking-wider" 
+                    : "text-[10px] font-mono font-bold text-[#10B981] tracking-wider";
+            }
+            if (demoElapsed) demoElapsed.textContent = `T+${String(demoState.elapsed).padStart(2, '0')}s / 15s`;
+            if (demoPhaseLabel) {
+                demoPhaseLabel.textContent = demoState.phase;
+                demoPhaseLabel.style.color = getPhaseColor(demoState.phase);
+            }
+        } else {
+            demoIndicator.classList.add('hidden');
+            demoIndicator.classList.remove('flex');
+        }
+    }
+
+    // Button states
+    if (btnDemoStart && btnDemoPause) {
+        if (isRunning) {
+            btnDemoStart.classList.add('hidden');
+            btnDemoPause.classList.remove('hidden');
+        } else {
+            btnDemoStart.classList.remove('hidden');
+            btnDemoPause.classList.add('hidden');
+            if (isCompleted) {
+                btnDemoStart.innerHTML = `<span>↺</span> RESTART DEMO`;
+            } else {
+                btnDemoStart.innerHTML = `<span>▶</span> START DEMO`;
+            }
+        }
+    }
+
+    // Demo Operations Console
+    if (consoleEl) {
+        if (store.currentMode === 'CONTROL_ROOM' && (isRunning || isCompleted)) {
+            consoleEl.classList.remove('hidden');
+            
+            if (timerEl) timerEl.textContent = `T+${String(demoState.elapsed).padStart(2, '0')}s / 15s`;
+            if (phaseEl) {
+                phaseEl.textContent = demoState.phase;
+                phaseEl.style.color = getPhaseColor(demoState.phase);
+            }
+            if (pulseEl) {
+                pulseEl.className = isCompleted 
+                    ? "w-2.5 h-2.5 rounded-full bg-[#3B82F6]" 
+                    : "w-2.5 h-2.5 rounded-full bg-[#10B981] animate-ping";
+            }
+
+            // Render Events
+            if (eventsEl && demoState.events && demoState.events.length > 0) {
+                eventsEl.innerHTML = demoState.events.map(e => `
+                    <div class="py-1 border-b border-[#30363d]/30 flex gap-2 items-start leading-tight">
+                        <span class="text-[#8b949e] font-mono text-[10px] shrink-0">${e.timeLabel}</span>
+                        <span class="text-[#e6edf3] flex-1">${e.text}</span>
+                    </div>
+                `).join('');
+                eventsEl.scrollTop = eventsEl.scrollHeight;
+            }
+
+            // Summary Card on completion
+            if (summaryEl) {
+                if (isCompleted) {
+                    summaryEl.classList.remove('hidden');
+                } else {
+                    summaryEl.classList.add('hidden');
+                }
+            }
+        } else if (store.currentMode !== 'CONTROL_ROOM') {
+            consoleEl.classList.add('hidden');
+        }
+    }
+}
+
+// -------------------------------------------------------------
 // Demo Controls (Start / Pause / Reset)
 // -------------------------------------------------------------
+const btnCloseDemoConsole = document.getElementById('btn-close-demo-console');
+if (btnCloseDemoConsole) {
+    btnCloseDemoConsole.addEventListener('click', () => {
+        const consoleEl = document.getElementById('demo-console');
+        if (consoleEl) consoleEl.classList.add('hidden');
+    });
+}
+
 if (btnDemoStart) {
     btnDemoStart.addEventListener('click', () => {
         ws.send(JSON.stringify({ event: 'START_DEMO' }));
         btnDemoStart.classList.add('hidden');
         if (btnDemoPause) btnDemoPause.classList.remove('hidden');
+        const consoleEl = document.getElementById('demo-console');
+        if (consoleEl && store.currentMode === 'CONTROL_ROOM') {
+            consoleEl.classList.remove('hidden');
+        }
     });
 }
 
@@ -971,13 +1089,22 @@ if (btnDemoReset) {
     btnDemoReset.addEventListener('click', () => {
         ws.send(JSON.stringify({ event: 'RESET_DEMO' }));
         if (btnDemoPause) btnDemoPause.classList.add('hidden');
-        if (btnDemoStart) btnDemoStart.classList.remove('hidden');
+        if (btnDemoStart) {
+            btnDemoStart.classList.remove('hidden');
+            btnDemoStart.innerHTML = `<span>▶</span> START DEMO`;
+        }
         if (emergencyHud) emergencyHud.classList.add('hidden');
         if (emergencyLayer) emergencyLayer.clearLayers();
         emergencyMarker = null;
         emergencyPolyline = null;
         emergencyGlowPolyline = null;
         store.emergencyActive = false;
+        
+        const consoleEl = document.getElementById('demo-console');
+        if (consoleEl) consoleEl.classList.add('hidden');
+        const summaryEl = document.getElementById('demo-console-summary');
+        if (summaryEl) summaryEl.classList.add('hidden');
+        
         if (btnSimulateEmergency) {
             btnSimulateEmergency.disabled = false;
             btnSimulateEmergency.classList.remove('opacity-50', 'cursor-not-allowed');

@@ -372,6 +372,55 @@ class RoutingEngine {
             timestamp: new Date().toISOString() 
         };
     }
+
+    findCorridorEmergencyRoute(originId = 'J3', destPoiId = 'hosp_welcare') {
+        const j3 = this.graph.controlledJunctions.find(j => j.id === 'J3');
+        const j4 = this.graph.controlledJunctions.find(j => j.id === 'J4');
+        const j5 = this.graph.controlledJunctions.find(j => j.id === 'J5');
+        const j6 = this.graph.controlledJunctions.find(j => j.id === 'J6');
+        const hospital = this.graph.pois.find(p => p.id === destPoiId) || this.graph.pois.find(p => p.id === 'hosp_welcare');
+
+        const waypoints = [
+            { id: 'J3', osmNodeId: j3.osmNodeId, name: j3.name, approach: 'NORTHBOUND' },
+            { id: 'J4', osmNodeId: j4.osmNodeId, name: j4.name, approach: 'WESTBOUND' },
+            { id: 'J5', osmNodeId: j5.osmNodeId, name: j5.name, approach: 'NORTHBOUND' },
+            { id: 'J6', osmNodeId: j6.osmNodeId, name: j6.name, approach: 'SOUTHBOUND' },
+            { id: hospital.id, osmNodeId: hospital.nearestNode, name: hospital.name }
+        ];
+
+        let fullRoute = [];
+        let fullGeometry = [];
+        let totalDistance = 0;
+        const controlledJunctionsPassed = [
+            { id: 'J3', name: j3.name, approach: 'NORTHBOUND', junctionNodeId: j3.osmNodeId },
+            { id: 'J4', name: j4.name, approach: 'WESTBOUND', junctionNodeId: j4.osmNodeId },
+            { id: 'J5', name: j5.name, approach: 'NORTHBOUND', junctionNodeId: j5.osmNodeId },
+            { id: 'J6', name: j6.name, approach: 'SOUTHBOUND', junctionNodeId: j6.osmNodeId }
+        ];
+
+        for (let i = 0; i < waypoints.length - 1; i++) {
+            const seg = this.findRoutes(waypoints[i].osmNodeId, waypoints[i+1].osmNodeId, []);
+            if (seg && seg.individual) {
+                totalDistance += seg.individual.distance;
+                if (i === 0) {
+                    fullRoute.push(...seg.individual.route);
+                } else {
+                    fullRoute.push(...seg.individual.route.slice(1));
+                }
+                fullGeometry.push(...seg.individual.geometry);
+            }
+        }
+
+        return {
+            hospital: hospital.name,
+            hospitalId: hospital.id,
+            route: fullRoute,
+            geometry: fullGeometry,
+            distance: totalDistance,
+            distanceKm: (totalDistance / 1000).toFixed(1),
+            controlledJunctionsPassed: controlledJunctionsPassed
+        };
+    }
 }
 
 module.exports = { RoutingEngine };

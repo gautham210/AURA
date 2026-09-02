@@ -202,8 +202,9 @@ setInterval(() => {
             });
         }
 
-        // Mock downstream utilization to test spillback counting over time
-        const util = 0.5 + 0.5 * Math.sin(tickCounter * 0.1); 
+        // Downstream backpressure derived from physical downstream queue vs storage capacity
+        const maxQ = Math.max(...Object.values(aura.state[jid]?.approaches || {}).map(a => a.q || 0));
+        const util = Math.min(1.0, maxQ / 12.0); 
         aura.updateBackPressure(jid, util); 
 
         aura.tick(jid, arrivals);
@@ -258,16 +259,7 @@ setInterval(() => {
             junctions: junctionsState,
             green_wave: getGreenWaveStates(),
             vision_replay: visionReplayStatus,
-            demo_state: {
-                active: demoController.active,
-                elapsed: demoController.elapsedSeconds,
-                phase: demoController.active 
-                    ? (demoController.elapsedSeconds <= 8 ? 'WARM-UP' 
-                       : demoController.elapsedSeconds <= 30 ? 'PEAK SURGE' 
-                       : demoController.elapsedSeconds <= 50 ? 'MODERATION' 
-                       : 'RECOVERY')
-                    : 'IDLE'
-            }
+            demo_state: demoController.getState()
         }
     };
 
