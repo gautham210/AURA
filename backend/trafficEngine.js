@@ -10,7 +10,10 @@ class TrafficEngine {
                 two_wheeler: 0.5,
                 auto_rickshaw: 1.0,
                 car: 1.0,
-                bus: 3.0
+                bus: 3.0,
+                'Two-wheeler': 0.5, 'bicycle': 0.5, 'Three-wheeler': 0.5,
+                'Hatchback': 1.0, 'Sedan': 1.0, 'SUV': 1.0, 'Van': 1.0, 'Others': 1.0,
+                'MUV': 3.0, 'Bus': 3.0, 'Truck': 3.0, 'LCV': 3.0, 'Mini-bus': 3.0, 'tempo-traveller': 3.0
             }
         };
 
@@ -203,6 +206,7 @@ class TrafficEngine {
         const junction = this.state[junctionId];
         let state = {
             current_phase: junction.currentPhaseIndex + 1,
+            current_phase_description: junction.phases[junction.currentPhaseIndex].join(" + "),
             phase_durations: junction.phaseDurations,
             phase_time_remaining: junction.phaseTimeRemaining,
             back_pressure_multiplier: junction.backPressureMultiplier,
@@ -314,6 +318,7 @@ class BaselineController {
         const junction = this.state[junctionId];
         let state = {
             current_phase: junction.currentPhaseIndex + 1,
+            current_phase_description: junction.phases[junction.currentPhaseIndex].join(" + "),
             phase_time_remaining: junction.phaseTimeRemaining,
             spillback_events: junction.spillbackEvents,
             approaches: {}

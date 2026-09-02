@@ -13,6 +13,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend')));
 
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/dashboard.html'));
+});
+
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
@@ -23,7 +27,7 @@ const simSensor = new SimulationSensor("AURA_DEMO_SEED");
 // 2 second timeout for vision
 const sensor = new HybridSensor(simSensor, 2000); 
 
-const junctionIds = graph.junctions.map(j => j.id);
+const junctionIds = graph.controlledJunctions.map(j => j.id);
 const approaches = ["NORTHBOUND", "SOUTHBOUND", "EASTBOUND", "WESTBOUND"];
 const phases = [["NORTHBOUND", "SOUTHBOUND"], ["EASTBOUND", "WESTBOUND"]];
 
@@ -53,7 +57,7 @@ const PROGRESSION_SPEED = 10; // m/s
 let cumulativeDistance = 0;
 const greenWaveOffsets = {};
 
-graph.junctions.forEach(j => {
+graph.controlledJunctions.forEach(j => {
     greenWaveOffsets[j.id] = Math.round(cumulativeDistance / PROGRESSION_SPEED) % CYCLE_LENGTH;
     cumulativeDistance += j.distanceToNext || 0;
 });
@@ -61,7 +65,7 @@ graph.junctions.forEach(j => {
 function getGreenWaveStates() {
     const cycleClock = Math.floor(Date.now() / 1000) % CYCLE_LENGTH;
     let states = {};
-    graph.junctions.forEach(j => {
+    graph.controlledJunctions.forEach(j => {
         const localTime = (cycleClock - greenWaveOffsets[j.id] + CYCLE_LENGTH) % CYCLE_LENGTH;
         states[j.id] = {
             offset: greenWaveOffsets[j.id],

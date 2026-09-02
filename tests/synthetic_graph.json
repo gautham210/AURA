@@ -1,0 +1,26 @@
+{
+  "nodes": [
+    { "id": "J1" },
+    { "id": "J2" },
+    { "id": "J3" },
+    { "id": "J4" },
+    { "id": "J5" },
+    { "id": "J6" }
+  ],
+  "edges": [
+    { "from": "J1", "to": "J2", "distance": 3500, "approachAtTarget": "SOUTHBOUND", "geometry": [] },
+    { "from": "J2", "to": "J3", "distance": 2000, "approachAtTarget": "WESTBOUND", "geometry": [] },
+    { "from": "J1", "to": "J5", "distance": 2000, "approachAtTarget": "EASTBOUND", "geometry": [] },
+    { "from": "J5", "to": "J6", "distance": 2500, "approachAtTarget": "SOUTHBOUND", "geometry": [] },
+    { "from": "J6", "to": "J3", "distance": 3000, "approachAtTarget": "SOUTHBOUND", "geometry": [] },
+    { "from": "J3", "to": "J4", "distance": 4000, "approachAtTarget": "SOUTHBOUND", "geometry": [] }
+  ],
+  "controlledJunctions": [
+    { "id": "J1", "name": "Edappally", "osmNodeId": "J1" },
+    { "id": "J2", "name": "Palarivattom", "osmNodeId": "J2" },
+    { "id": "J3", "name": "Kaloor", "osmNodeId": "J3" },
+    { "id": "J4", "name": "Maharajas", "osmNodeId": "J4" },
+    { "id": "J5", "name": "Kadavanthra", "osmNodeId": "J5" },
+    { "id": "J6", "name": "Vyttila", "osmNodeId": "J6" }
+  ]
+}
