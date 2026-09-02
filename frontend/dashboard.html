@@ -55,19 +55,31 @@
             70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
             100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
+        @keyframes pulse-emergency {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.9); }
+            50% { box-shadow: 0 0 0 14px rgba(59, 130, 246, 0); }
+        }
         .signal-green { background-color: #10B981; animation: pulse-signal-green 2s infinite; }
         .signal-red { background-color: #EF4444; animation: pulse-signal-red 2s infinite; }
+        .signal-emergency { background-color: #3B82F6; animation: pulse-emergency 1s infinite; }
         
-        /* Queue blip animations */
-        @keyframes blip-glow {
-            0%, 100% { transform: scale(1); opacity: 0.9; }
-            50% { transform: scale(1.18); opacity: 1; }
+        /* Emergency vehicle animation */
+        @keyframes siren-flash {
+            0%, 100% { filter: drop-shadow(0 0 12px #EF4444); }
+            50% { filter: drop-shadow(0 0 12px #3B82F6); }
         }
-        .queue-blip { animation: blip-glow 1.5s ease-in-out infinite; }
+        .emergency-siren { animation: siren-flash 0.6s infinite; }
 
-        /* Route Dash Animation */
-        @keyframes dash-anim { to { stroke-dashoffset: -20; } }
-        .route-dash { stroke-dasharray: 8 8; animation: dash-anim 1.2s linear infinite; }
+        /* Traffic Particle Canvas */
+        #traffic-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 15;
+        }
     </style>
 </head>
 <body class="bg-[#07090e] text-[#e6edf3] h-screen w-screen overflow-hidden flex flex-col antialiased selection:bg-[#3B82F6] selection:text-white">
@@ -97,9 +109,15 @@
             </div>
         </div>
 
-        <div class="flex gap-4 items-center">
+        <div class="flex gap-3 items-center">
+            <!-- Emergency Preemption Simulation Button -->
+            <button id="btn-simulate-emergency" class="px-3 py-1.5 bg-gradient-to-r from-[#DC2626] to-[#EF4444] hover:from-[#B91C1C] hover:to-[#DC2626] text-white text-xs font-bold rounded-md border border-[#F87171]/50 shadow-[0_0_14px_rgba(220,38,38,0.5)] transition-all flex items-center gap-1.5 active:scale-95">
+                <span class="text-sm">🚨</span>
+                <span>SIMULATE EMERGENCY</span>
+            </button>
+
             <!-- Control Mode Indicator -->
-            <div class="flex items-center gap-2 bg-[#161b22] px-3 py-1 rounded-md border border-[#30363d]">
+            <div class="flex items-center gap-2 bg-[#161b22] px-3 py-1.5 rounded-md border border-[#30363d]">
                 <span class="w-2 h-2 rounded-full bg-[#3B82F6] animate-pulse"></span>
                 <span class="text-[10px] text-[#8b949e] font-bold tracking-wider uppercase">CONTROL:</span>
                 <span class="text-[10px] text-[#60A5FA] font-mono font-bold tracking-wider uppercase">AURA COOPERATIVE</span>
@@ -107,14 +125,14 @@
 
             <!-- Provenance / Source Badges -->
             <div class="flex items-center gap-2">
-                <div class="text-[10px] font-mono font-semibold px-2.5 py-1 rounded bg-[#161b22] text-[#8b949e] border border-[#30363d] flex items-center gap-1.5">
+                <div class="text-[10px] font-mono font-semibold px-2.5 py-1.5 rounded bg-[#161b22] text-[#8b949e] border border-[#30363d] flex items-center gap-1.5">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
-                    OSM REAL NETWORK
+                    OSM NETWORK
                 </div>
-                <div id="data-source" class="text-[10px] font-mono font-bold px-2.5 py-1 rounded bg-[#161b22] text-[#8b949e] border border-[#30363d] transition-colors">
+                <div id="data-source" class="text-[10px] font-mono font-bold px-2.5 py-1.5 rounded bg-[#161b22] text-[#8b949e] border border-[#30363d] transition-colors">
                     DATA: SIMULATED
                 </div>
-                <div id="connection-status" class="text-[10px] font-mono font-bold text-[#F59E0B] px-2 py-1 rounded bg-[#161b22] border border-[#30363d]">
+                <div id="connection-status" class="text-[10px] font-mono font-bold text-[#F59E0B] px-2 py-1.5 rounded bg-[#161b22] border border-[#30363d]">
                     ● CONNECTING
                 </div>
             </div>
@@ -136,7 +154,7 @@
                 <span id="metric-demand" class="font-mono text-sm font-bold text-[#F59E0B]">-- PCU</span>
             </div>
             <div class="w-px h-4 bg-[#30363d]"></div>
-            <!-- Spillback Events with descriptive tooltip -->
+            <!-- Spillback Events with exact tooltip -->
             <div class="flex items-center gap-3 group relative cursor-help" title="Times a queue reached the upstream boundary of an approach.">
                 <span class="text-[#8b949e] text-[10px] font-bold tracking-widest uppercase border-b border-dotted border-[#8b949e]/60">Spillback Events</span>
                 <span id="metric-spillbacks" class="font-mono text-sm font-bold text-[#EF4444]">--</span>
@@ -148,8 +166,8 @@
             </div>
             <div class="flex-1"></div>
             <div class="flex items-center gap-2">
-                <span class="text-[10px] font-mono text-[#8b949e]">HOSPITALS & RESCUE:</span>
-                <span id="poi-summary-badge" class="text-[10px] font-mono text-white bg-[#161b22] px-2 py-0.5 rounded border border-[#30363d]">🏥 57 Hospitals</span>
+                <span class="text-[10px] font-mono text-[#8b949e]">EMERGENCY NETWORK:</span>
+                <span id="poi-summary-badge" class="text-[10px] font-mono text-white bg-[#161b22] px-2 py-0.5 rounded border border-[#30363d]">🏥 10 Major Hospitals</span>
             </div>
         </div>
 
@@ -157,6 +175,32 @@
         <div class="flex-1 relative flex">
             <!-- Map Container -->
             <div id="map" class="absolute inset-0 z-0 bg-[#07090e]"></div>
+
+            <!-- Flowing Traffic Particles Canvas Overlay -->
+            <canvas id="traffic-canvas"></canvas>
+
+            <!-- Emergency Active HUD Banner (Top Center) -->
+            <div id="emergency-hud" class="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-[#0d1117]/95 backdrop-blur-md border border-[#EF4444] rounded-lg px-5 py-3 shadow-[0_0_30px_rgba(239,68,68,0.4)] flex items-center gap-4 hidden transition-all">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-[#EF4444] animate-ping"></span>
+                    <span class="text-xs font-mono font-extrabold text-[#EF4444] tracking-wider uppercase">EMERGENCY PRIORITY ACTIVE</span>
+                </div>
+                <div class="w-px h-5 bg-[#30363d]"></div>
+                <div class="flex flex-col">
+                    <span class="text-[9px] font-mono text-[#8b949e] uppercase">DESTINATION</span>
+                    <span id="hud-dest-hospital" class="text-xs font-bold text-white tracking-tight">--</span>
+                </div>
+                <div class="w-px h-5 bg-[#30363d]"></div>
+                <div class="flex flex-col">
+                    <span class="text-[9px] font-mono text-[#8b949e] uppercase">ETA</span>
+                    <span id="hud-eta" class="text-xs font-mono font-bold text-[#10B981]">--s</span>
+                </div>
+                <div class="w-px h-5 bg-[#30363d]"></div>
+                <div class="flex flex-col">
+                    <span class="text-[9px] font-mono text-[#8b949e] uppercase">PREEMPTION STATUS</span>
+                    <span id="hud-status" class="text-xs font-mono font-bold text-[#60A5FA]">CLEARING CORRIDOR...</span>
+                </div>
+            </div>
 
             <!-- Soft Map Vignette -->
             <div class="absolute inset-0 pointer-events-none z-10 shadow-[inset_0_0_80px_rgba(7,9,14,0.85)]"></div>
