@@ -8,11 +8,11 @@
     { "id": "J6", "name": "Tripunithura", "lat": 9.9500, "lng": 76.3500, "distanceToNext": 0 }
   ],
   "edges": [
-    { "from": "J1", "to": "J2", "distance": 3500, "approach": "SOUTHBOUND" },
-    { "from": "J2", "to": "J3", "distance": 2000, "approach": "SOUTHBOUND" },
-    { "from": "J3", "to": "J4", "distance": 4000, "approach": "SOUTHBOUND" },
-    { "from": "J1", "to": "J5", "distance": 2000, "approach": "EASTBOUND" },
-    { "from": "J5", "to": "J6", "distance": 3000, "approach": "SOUTHBOUND" },
-    { "from": "J6", "to": "J3", "distance": 2500, "approach": "WESTBOUND" }
+    { "from": "J1", "to": "J2", "distance": 3500, "approachAtTarget": "SOUTHBOUND" },
+    { "from": "J2", "to": "J3", "distance": 2000, "approachAtTarget": "SOUTHBOUND" },
+    { "from": "J3", "to": "J4", "distance": 4000, "approachAtTarget": "SOUTHBOUND" },
+    { "from": "J1", "to": "J5", "distance": 2000, "approachAtTarget": "EASTBOUND" },
+    { "from": "J5", "to": "J6", "distance": 3000, "approachAtTarget": "SOUTHBOUND" },
+    { "from": "J6", "to": "J3", "distance": 2500, "approachAtTarget": "WESTBOUND" }
   ]
 }

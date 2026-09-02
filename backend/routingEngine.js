@@ -14,7 +14,7 @@ class RoutingEngine {
         let queue_pcu = 0;
 
         if (targetJunction && targetJunction.aura) {
-            const approachState = targetJunction.aura.approaches[edge.approach];
+            const approachState = targetJunction.aura.approaches[edge.approachAtTarget];
             if (approachState) {
                 queue_pcu = approachState.queue_pcu;
                 // Assuming 50 PCU is full saturation for demo routing
