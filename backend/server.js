@@ -7,7 +7,7 @@ const cors = require('cors');
 const { SimulationSensor, HybridSensor } = require('./trafficSensors');
 const { TrafficEngine, BaselineController } = require('./trafficEngine');
 const { RoutingEngine } = require('./routingEngine');
-const { DemoTrafficController } = require('./demoTrafficController');
+const { TrafficDemoController, EmergencyDemoController } = require('./demoTrafficController');
 
 const app = express();
 app.use(cors());
@@ -38,7 +38,8 @@ const baseline = new BaselineController(engineConfig);
 const routingEngine = new RoutingEngine(graph);
 
 let latestNetworkState = [];
-const demoController = new DemoTrafficController(aura, graph);
+const trafficDemoController = new TrafficDemoController(aura, graph);
+const emergencyDemoController = new EmergencyDemoController(aura, graph);
 
 junctionIds.forEach(jid => {
     aura.initJunction(jid, phases);
@@ -94,7 +95,7 @@ app.post('/vision-update', (req, res) => {
 });
 
 let connectedClients = new Set();
-demoController.onEmergencyUpdate = (state) => {
+emergencyDemoController.onEmergencyUpdate = (state) => {
     const message = JSON.stringify({
         event: "EMERGENCY_UPDATE",
         timestamp: new Date().toISOString(),
@@ -148,13 +149,17 @@ wss.on('connection', (ws) => {
                     }));
                 }
             } else if (payload.event === "START_DEMO") {
-                demoController.start();
+                emergencyDemoController.reset();
+                trafficDemoController.start();
             } else if (payload.event === "PAUSE_DEMO") {
-                demoController.pause();
+                trafficDemoController.pause();
+                emergencyDemoController.pause();
             } else if (payload.event === "RESET_DEMO") {
-                demoController.reset();
+                trafficDemoController.reset();
+                emergencyDemoController.reset();
             } else if (payload.event === "TRIGGER_EMERGENCY") {
-                demoController.triggerEmergency(payload.data?.origin);
+                trafficDemoController.reset();
+                emergencyDemoController.start();
             }
         } catch (e) {
             console.error("WS error", e);
@@ -180,15 +185,15 @@ setInterval(() => {
     tickCounter++;
 
     let demoArrivals = null;
-    if (demoController.active) {
-        demoArrivals = demoController.getSimulatedArrivals();
+    if (trafficDemoController.active) {
+        demoArrivals = trafficDemoController.getSimulatedArrivals();
     }
 
     junctionIds.forEach(jid => {
         let arrivals = {};
         let sourceModes = {};
         
-        if (demoController.active) {
+        if (trafficDemoController.active) {
             approaches.forEach(appr => {
                 const count = (demoArrivals[jid] && demoArrivals[jid][appr]) ? demoArrivals[jid][appr].counts.car : 0;
                 arrivals[appr] = { counts: { car: count } };
@@ -259,7 +264,8 @@ setInterval(() => {
             junctions: junctionsState,
             green_wave: getGreenWaveStates(),
             vision_replay: visionReplayStatus,
-            demo_state: demoController.getState()
+            traffic_demo_state: trafficDemoController.getState(),
+            emergency_demo_state: emergencyDemoController.getState()
         }
     };
 

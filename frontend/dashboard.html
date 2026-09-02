@@ -76,9 +76,15 @@
             0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.9); }
             50% { box-shadow: 0 0 0 14px rgba(59, 130, 246, 0); }
         }
+        @keyframes pulse-signal-amber {
+            0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
         .signal-green { background-color: #10B981; animation: pulse-signal-green 2s infinite; }
         .signal-red { background-color: #EF4444; animation: pulse-signal-red 2s infinite; }
-        .signal-emergency { background-color: #3B82F6; animation: pulse-emergency 1s infinite; }
+        .signal-amber { background-color: #F59E0B; animation: pulse-signal-amber 1.5s infinite; }
+        .signal-emergency { background-color: #10B981; animation: pulse-signal-green 1s infinite; box-shadow: 0 0 14px rgba(16, 185, 129, 0.9); }
         
         /* Emergency vehicle animation */
         @keyframes siren-flash {
@@ -209,7 +215,7 @@
             <div id="demo-status-indicator" class="hidden items-center gap-2 px-3 py-1 bg-[#10B981]/10 border border-[#10B981]/40 rounded-md animate-pulse">
                 <span class="w-2 h-2 rounded-full bg-[#10B981]"></span>
                 <span id="demo-status-text" class="text-[10px] font-mono font-bold text-[#10B981] tracking-wider">DEMO RUNNING</span>
-                <span id="demo-elapsed" class="text-[10px] font-mono font-bold text-white">T+0s / 15s</span>
+                <span id="demo-elapsed" class="text-[10px] font-mono font-bold text-white">T+0s / 10s</span>
                 <span class="text-[#30363d]">|</span>
                 <span id="demo-phase-label" class="text-[10px] font-mono font-bold text-[#F59E0B]">TRAFFIC BUILDUP</span>
             </div>
@@ -236,7 +242,7 @@
                 </div>
                 <div class="w-px h-5 bg-[#30363d]"></div>
                 <div class="flex flex-col">
-                    <span class="text-[9px] font-mono text-[#8b949e] uppercase">ETA</span>
+                    <span class="text-[9px] font-mono text-[#8b949e] uppercase">SIMULATION ETA</span>
                     <span id="hud-eta" class="text-xs font-mono font-bold text-[#10B981]">--s</span>
                 </div>
                 <div class="w-px h-5 bg-[#30363d]"></div>
@@ -417,7 +423,7 @@
                         </h3>
                     </div>
                     <div class="flex items-center gap-2">
-                        <span id="demo-console-timer" class="font-mono text-xs font-bold text-white px-2 py-0.5 rounded bg-[#0d1117] border border-[#30363d]">T+00s / 15s</span>
+                        <span id="demo-console-timer" class="font-mono text-xs font-bold text-white px-2 py-0.5 rounded bg-[#0d1117] border border-[#30363d]">T+00s / 10s</span>
                         <button id="btn-close-demo-console" class="text-[#8b949e] hover:text-white p-0.5 rounded hover:bg-[#30363d] transition-colors" title="Close Console">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
                         </button>

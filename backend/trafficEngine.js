@@ -148,12 +148,24 @@ class TrafficEngine {
         if (approach) {
             junction.emergency.active = true;
             junction.emergency.approach = approach;
-            if (bufferTicks === 0) {
+            if (bufferTicks === 'STANDBY') {
+                junction.emergency.state = 'EMERGENCY_STANDBY';
+                junction.emergency.timer = 0;
+            } else if (bufferTicks === 0) {
                 junction.emergency.state = 'EMERGENCY_GREEN';
                 junction.emergency.timer = 0;
+                
+                let targetPhase = null;
+                for (const phase of junction.phases) {
+                    if (phase.includes(approach)) {
+                        targetPhase = phase;
+                        break;
+                    }
+                }
+                
                 for (const phase of junction.phases) {
                     for (const app of phase) {
-                        junction.approaches[app].signalState = (app === approach) ? "GREEN" : "RED";
+                        junction.approaches[app].signalState = (targetPhase && targetPhase.includes(app)) ? "GREEN" : "RED";
                     }
                 }
             } else {
@@ -260,7 +272,7 @@ class TrafficEngine {
         }
 
         // --- 2. Emergency Preemption vs Normal Phase Control ---
-        if (junction.emergency.active) {
+        if (junction.emergency.active && junction.emergency.state !== 'EMERGENCY_STANDBY') {
             if (junction.emergency.state === 'CLEARING') {
                 for (let i = 0; i < junction.phases.length; i++) {
                     for (const app of junction.phases[i]) junction.approaches[app].signalState = "RED";
@@ -268,17 +280,32 @@ class TrafficEngine {
                 junction.emergency.timer--;
                 if (junction.emergency.timer <= 0) {
                     junction.emergency.state = 'EMERGENCY_GREEN';
-                    // Authoritative preemption green: priority approach gets GREEN, all conflicting approaches remain RED
+                    
+                    let targetPhase = null;
+                    for (const phase of junction.phases) {
+                        if (phase.includes(junction.emergency.approach)) {
+                            targetPhase = phase;
+                            break;
+                        }
+                    }
+                    // Authoritative preemption green: priority phase gets GREEN
                     for (let i = 0; i < junction.phases.length; i++) {
                         for (const app of junction.phases[i]) {
-                            junction.approaches[app].signalState = (app === junction.emergency.approach) ? "GREEN" : "RED";
+                            junction.approaches[app].signalState = (targetPhase && targetPhase.includes(app)) ? "GREEN" : "RED";
                         }
                     }
                 }
             } else if (junction.emergency.state === 'EMERGENCY_GREEN') {
+                let targetPhase = null;
+                for (const phase of junction.phases) {
+                    if (phase.includes(junction.emergency.approach)) {
+                        targetPhase = phase;
+                        break;
+                    }
+                }
                 for (let i = 0; i < junction.phases.length; i++) {
                     for (const app of junction.phases[i]) {
-                        junction.approaches[app].signalState = (app === junction.emergency.approach) ? "GREEN" : "RED";
+                        junction.approaches[app].signalState = (targetPhase && targetPhase.includes(app)) ? "GREEN" : "RED";
                     }
                 }
             } else if (junction.emergency.state === 'RECOVERY') {
@@ -363,6 +390,7 @@ class TrafficEngine {
         const phaseDescriptions = {
             "NORTH_SOUTH": "Northbound + Southbound Through Movements",
             "EAST_WEST": "Eastbound + Westbound Through Movements",
+            "EMERGENCY_STANDBY": "Standby for Incoming Emergency Vehicle",
             "CLEARING": "Safety Clearance (All Red Buffer)",
             "EMERGENCY_GREEN": `Emergency Priority (${junction.emergency.approach || 'Corridor'})`,
             "RECOVERY": "Post-Emergency Recovery Clearance"

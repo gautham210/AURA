@@ -51,8 +51,9 @@ class AuraStateStore {
         }
         
         // Update Demo Operations Console & Status Badges
-        this.latestDemoState = stateData.demo_state;
-        updateDemoOperationsConsole(this.latestDemoState);
+        this.latestTrafficDemoState = stateData.traffic_demo_state;
+        this.latestEmergencyDemoState = stateData.emergency_demo_state;
+        updateDemoOperationsConsole(this.latestTrafficDemoState);
     }
 }
 
@@ -113,7 +114,7 @@ function switchMode(mode) {
         
         // Restore Demo Operations Console if demo is running or completed
         const demoConsole = document.getElementById('demo-console');
-        if (demoConsole && store.latestDemoState && (store.latestDemoState.active || store.latestDemoState.completed)) {
+        if (demoConsole && store.latestTrafficDemoState && (store.latestTrafficDemoState.active || store.latestTrafficDemoState.completed)) {
             demoConsole.classList.remove('hidden');
         }
         
@@ -450,7 +451,9 @@ function updateMapMarkers(networkState) {
         // Update Pip
         if (pipEl) {
             if (isEmergency) {
-                pipEl.className = "absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#3B82F6] border-2 border-[#0d1117] shadow-[0_0_8px_#3B82F6] animate-ping";
+                pipEl.className = isGreen
+                    ? "absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#10B981] border-2 border-[#3B82F6] shadow-[0_0_8px_#10B981] animate-pulse"
+                    : "absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#EF4444] border-2 border-[#3B82F6] shadow-[0_0_8px_#EF4444]";
             } else if (isGreen) {
                 pipEl.className = "absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#10B981] border-2 border-[#0d1117] shadow-[0_0_6px_#10B981]";
             } else {
@@ -575,7 +578,9 @@ function renderJunctionDetail(id) {
             const appState = jState.aura.approaches[dir];
             if (appState) {
                 if (isEm && jState.aura.emergency.approach === dir && jState.aura.emergency.state === 'EMERGENCY_GREEN') {
-                    el.className = "w-5 h-5 rounded-full border border-[#30363d] signal-emergency";
+                    el.className = "w-5 h-5 rounded-full border-2 border-[#3B82F6] signal-green";
+                } else if (isEm && jState.aura.emergency.state === 'CLEARING') {
+                    el.className = "w-5 h-5 rounded-full border border-[#30363d] signal-amber";
                 } else if (appState.signal_state === "GREEN") {
                     el.className = "w-5 h-5 rounded-full border border-[#30363d] signal-green";
                 } else {
@@ -759,20 +764,54 @@ function updateGreenWavePanel(gwData) {
     
     grid.innerHTML = '';
     
-    Object.keys(gwData).forEach(jid => {
-        const data = gwData[jid];
-        const isGreen = data.state === "GREEN";
-        const stateColor = isGreen ? "text-[#10B981] bg-[#10B981]/10 border-[#10B981]/30" : "text-[#EF4444] bg-[#EF4444]/10 border-[#EF4444]/30";
-        
-        const html = `
-            <div class="bg-[#161b22] border border-[#30363d] rounded p-2 flex justify-between items-center shadow-sm">
-                <span class="text-[10px] font-mono font-bold text-white">${jid}</span>
-                <span class="text-[9px] font-mono font-semibold text-[#8b949e]">${data.offset}s</span>
-                <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${stateColor}">${data.state}</span>
-            </div>
-        `;
-        grid.insertAdjacentHTML('beforeend', html);
-    });
+    if (store.emergencyActive && store.networkState) {
+        // Render Emergency Wave Corridor
+        const emergencyNodes = ["J3", "J4", "J5", "J6"];
+        emergencyNodes.forEach(jid => {
+            const jState = store.networkState.find(j => j.junction_id === jid);
+            if (!jState || !jState.aura || !jState.aura.emergency) return;
+            
+            const emState = jState.aura.emergency.state;
+            let statusText = "STANDBY";
+            let stateColor = "text-[#8b949e] bg-[#30363d]/50 border-[#30363d]/50";
+            
+            if (emState === "EMERGENCY_GREEN") {
+                statusText = "ACTIVE";
+                stateColor = "text-[#10B981] bg-[#10B981]/10 border-[#10B981]/30";
+            } else if (emState === "RECOVERY" || emState === "NORMAL") {
+                // If it was normal but emergency is active, it means it already cleared (or hasn't reached it, but STANDBY handles that)
+                statusText = "CLEARED";
+                stateColor = "text-[#3B82F6] bg-[#3B82F6]/10 border-[#3B82F6]/30";
+            } else if (emState === "CLEARING") {
+                statusText = "CLEARING";
+                stateColor = "text-[#F59E0B] bg-[#F59E0B]/10 border-[#F59E0B]/30";
+            }
+
+            const html = `
+                <div class="bg-[#161b22] border border-[#30363d] rounded p-2 flex justify-between items-center shadow-sm">
+                    <span class="text-[10px] font-mono font-bold text-white">${jid}</span>
+                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${stateColor}">${statusText}</span>
+                </div>
+            `;
+            grid.insertAdjacentHTML('beforeend', html);
+        });
+    } else {
+        // Render Normal Progression Offsets
+        Object.keys(gwData).forEach(jid => {
+            const data = gwData[jid];
+            const isGreen = data.state === "GREEN";
+            const stateColor = isGreen ? "text-[#10B981] bg-[#10B981]/10 border-[#10B981]/30" : "text-[#EF4444] bg-[#EF4444]/10 border-[#EF4444]/30";
+            
+            const html = `
+                <div class="bg-[#161b22] border border-[#30363d] rounded p-2 flex justify-between items-center shadow-sm">
+                    <span class="text-[10px] font-mono font-bold text-white">${jid}</span>
+                    <span class="text-[9px] font-mono font-semibold text-[#8b949e]">${data.offset}s</span>
+                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${stateColor}">${data.state}</span>
+                </div>
+            `;
+            grid.insertAdjacentHTML('beforeend', html);
+        });
+    }
 }
 
 // -------------------------------------------------------------
@@ -853,6 +892,20 @@ if (btnSimulateEmergency) {
         ws.send(JSON.stringify({ event: "TRIGGER_EMERGENCY" }));
         btnSimulateEmergency.disabled = true;
         btnSimulateEmergency.classList.add('opacity-50', 'cursor-not-allowed');
+        
+        // Client-side prediction: instantly hide Traffic Demo console to prevent 1s flicker
+        const consoleEl = document.getElementById('demo-console');
+        if (consoleEl) consoleEl.classList.add('hidden');
+        const demoIndicator = document.getElementById('demo-status-indicator');
+        if (demoIndicator) {
+            demoIndicator.classList.add('hidden');
+            demoIndicator.classList.remove('flex');
+        }
+        if (btnDemoStart) {
+            btnDemoStart.classList.remove('hidden');
+            btnDemoStart.innerHTML = `<span>▶</span> START DEMO`;
+        }
+        if (btnDemoPause) btnDemoPause.classList.add('hidden');
     });
 }
 
@@ -874,8 +927,13 @@ function handleEmergencyUpdate(data) {
 
             if (destEl) destEl.textContent = data.hospital || "🏥 Major Hospital";
             const distKm = ((data.distanceRemaining || 0) / 1000).toFixed(1);
-            if (etaEl) etaEl.textContent = `${Math.ceil((data.distanceRemaining || 0) / 15)}s (${distKm} km)`;
-            if (statusEl) statusEl.textContent = data.junctionsRemaining > 0 ? `PREEMPTING ${data.junctionsRemaining} AURA JUNCTIONS` : "APPROACHING DESTINATION";
+            if (etaEl) {
+            const elapsed = data.elapsed || 0;
+            const duration = data.duration || 10;
+            const simRemaining = Math.max(0, duration - elapsed);
+            etaEl.textContent = `T+${elapsed}s / ${duration}s (${distKm} km)`;
+        }
+        if (statusEl) statusEl.textContent = data.junctionsRemaining > 0 ? `PREEMPTING ${data.junctionsRemaining} AURA JUNCTIONS` : "APPROACHING DESTINATION";
         }
 
         if (map && emergencyLayer) {
@@ -929,6 +987,13 @@ function handleEmergencyUpdate(data) {
         emergencyMarker = null;
         emergencyPolyline = null;
         emergencyGlowPolyline = null;
+
+        const destEl = document.getElementById('hud-dest-hospital');
+        const etaEl = document.getElementById('hud-eta');
+        const statusEl = document.getElementById('hud-status');
+        if (destEl) destEl.textContent = "--";
+        if (etaEl) etaEl.textContent = "--s";
+        if (statusEl) statusEl.textContent = "CLEARING CORRIDOR...";
 
         if (btnSimulateEmergency) {
             btnSimulateEmergency.disabled = false;
@@ -986,7 +1051,7 @@ function updateDemoOperationsConsole(demoState) {
                     ? "text-[10px] font-mono font-bold text-[#60A5FA] tracking-wider" 
                     : "text-[10px] font-mono font-bold text-[#10B981] tracking-wider";
             }
-            if (demoElapsed) demoElapsed.textContent = `T+${String(demoState.elapsed).padStart(2, '0')}s / 15s`;
+            if (demoElapsed) demoElapsed.textContent = `T+${String(demoState.elapsed).padStart(2, '0')}s / ${demoState.duration || 10}s`;
             if (demoPhaseLabel) {
                 demoPhaseLabel.textContent = demoState.phase;
                 demoPhaseLabel.style.color = getPhaseColor(demoState.phase);
@@ -1018,7 +1083,7 @@ function updateDemoOperationsConsole(demoState) {
         if (store.currentMode === 'CONTROL_ROOM' && (isRunning || isCompleted)) {
             consoleEl.classList.remove('hidden');
             
-            if (timerEl) timerEl.textContent = `T+${String(demoState.elapsed).padStart(2, '0')}s / 15s`;
+            if (timerEl) timerEl.textContent = `T+${String(demoState.elapsed).padStart(2, '0')}s / ${demoState.duration || 10}s`;
             if (phaseEl) {
                 phaseEl.textContent = demoState.phase;
                 phaseEl.style.color = getPhaseColor(demoState.phase);
@@ -1048,7 +1113,7 @@ function updateDemoOperationsConsole(demoState) {
                     summaryEl.classList.add('hidden');
                 }
             }
-        } else if (store.currentMode !== 'CONTROL_ROOM') {
+        } else {
             consoleEl.classList.add('hidden');
         }
     }
@@ -1067,6 +1132,24 @@ if (btnCloseDemoConsole) {
 
 if (btnDemoStart) {
     btnDemoStart.addEventListener('click', () => {
+        // Mutual exclusion: START_DEMO unconditionally clears any emergency overlay
+        if (emergencyHud) emergencyHud.classList.add('hidden');
+        if (emergencyLayer) emergencyLayer.clearLayers();
+        emergencyMarker = null;
+        emergencyPolyline = null;
+        emergencyGlowPolyline = null;
+        store.emergencyActive = false;
+        const destEl = document.getElementById('hud-dest-hospital');
+        const etaEl = document.getElementById('hud-eta');
+        const statusEl = document.getElementById('hud-status');
+        if (destEl) destEl.textContent = "--";
+        if (etaEl) etaEl.textContent = "--s";
+        if (statusEl) statusEl.textContent = "CLEARING CORRIDOR...";
+        if (btnSimulateEmergency) {
+            btnSimulateEmergency.disabled = false;
+            btnSimulateEmergency.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
         ws.send(JSON.stringify({ event: 'START_DEMO' }));
         btnDemoStart.classList.add('hidden');
         if (btnDemoPause) btnDemoPause.classList.remove('hidden');
@@ -1100,6 +1183,13 @@ if (btnDemoReset) {
         emergencyGlowPolyline = null;
         store.emergencyActive = false;
         
+        const destEl = document.getElementById('hud-dest-hospital');
+        const etaEl = document.getElementById('hud-eta');
+        const statusEl = document.getElementById('hud-status');
+        if (destEl) destEl.textContent = "--";
+        if (etaEl) etaEl.textContent = "--s";
+        if (statusEl) statusEl.textContent = "CLEARING CORRIDOR...";
+
         const consoleEl = document.getElementById('demo-console');
         if (consoleEl) consoleEl.classList.add('hidden');
         const summaryEl = document.getElementById('demo-console-summary');
