@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA - User View</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-primary": "#005ac2",
+                    "surface-variant": "#32353c",
+                    "primary-container": "#4d8eff",
+                    "secondary-container": "#00a572",
+                    "on-tertiary-fixed-variant": "#723600",
+                    "on-tertiary-fixed": "#311400",
+                    "surface": "#10131a",
+                    "surface-container-high": "#272a31",
+                    "secondary-fixed": "#6ffbbe",
+                    "on-tertiary": "#502400",
+                    "inverse-on-surface": "#2e3038",
+                    "surface-container-highest": "#32353c",
+                    "secondary-fixed-dim": "#4edea3",
+                    "error-container": "#93000a",
+                    "on-error": "#690005",
+                    "on-secondary-fixed": "#002113",
+                    "surface-container-low": "#191b23",
+                    "on-primary-container": "#00285d",
+                    "background": "#10131a",
+                    "secondary": "#4edea3",
+                    "on-primary-fixed": "#001a42",
+                    "primary-fixed": "#d8e2ff",
+                    "primary-fixed-dim": "#adc6ff",
+                    "on-error-container": "#ffdad6",
+                    "inverse-surface": "#e1e2ec",
+                    "primary": "#adc6ff",
+                    "outline-variant": "#424754",
+                    "on-surface": "#e1e2ec",
+                    "surface-bright": "#363941",
+                    "surface-container-lowest": "#0b0e15",
+                    "on-primary-fixed-variant": "#004395",
+                    "on-primary": "#002e6a",
+                    "surface-dim": "#10131a",
+                    "tertiary": "#ffb786",
+                    "on-surface-variant": "#c2c6d6",
+                    "surface-tint": "#adc6ff",
+                    "outline": "#8c909f",
+                    "error": "#ffb4ab",
+                    "tertiary-fixed-dim": "#ffb786",
+                    "on-secondary-container": "#00311f",
+                    "on-secondary": "#003824",
+                    "surface-container": "#1d2027",
+                    "on-tertiary-container": "#461f00",
+                    "on-secondary-fixed-variant": "#005236",
+                    "on-background": "#e1e2ec",
+                    "tertiary-container": "#df7412",
+                    "tertiary-fixed": "#ffdcc6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gutter": "1rem",
+                    "unit": "4px",
+                    "component-gap": "0.5rem",
+                    "sidebar-width": "320px",
+                    "container-padding": "1.5rem"
+            },
+            "fontFamily": {
+                    "data-mono": ["JetBrains Mono"],
+                    "label-caps": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "body-md": ["Inter"],
+                    "display-lg": ["Inter"]
+            },
+            "fontSize": {
+                    "data-mono": ["13px", {"lineHeight": "16px", "fontWeight": "500"}],
+                    "label-caps": ["10px", {"lineHeight": "12px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "body-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "display-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #424754; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #8c909f; }
+        
+        /* Map route animation */
+        @keyframes dash {
+          to { stroke-dashoffset: -100; }
+        }
+        .route-pulse {
+            stroke-dasharray: 8 8;
+            animation: dash 3s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface flex flex-col h-screen overflow-hidden font-body-md antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopNavBar (JSON Shared Component Blueprint) -->
+<nav class="bg-surface dark:bg-surface docked full-width top-0 border-b border-outline-variant dark:border-outline-variant flex justify-between items-center w-full px-gutter h-12 z-50 shrink-0 shadow-sm">
+<div class="flex items-center gap-8">
+<div class="text-headline-md font-headline-md font-bold tracking-tighter text-primary dark:text-primary">AURA</div>
+<div class="hidden md:flex gap-4 items-center mt-1">
+<a class="text-on-surface-variant dark:text-on-surface-variant font-medium hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors text-label-caps font-label-caps px-2 py-1 rounded" href="#">Control Room</a>
+<a class="text-primary dark:text-primary border-b-2 border-primary pb-1 font-bold hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors text-label-caps font-label-caps px-2 py-1" href="#">User View</a>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<button class="text-label-caps font-label-caps px-3 py-1.5 bg-error-container text-on-error-container rounded hover:opacity-80 transition-opacity">Emergency</button>
+<button class="text-label-caps font-label-caps px-3 py-1.5 border border-outline-variant text-on-surface hover:bg-surface-container-high transition-colors rounded">Aura/Baseline Toggle</button>
+<div class="h-4 w-px bg-outline-variant mx-1"></div>
+<div class="flex gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined hover:bg-surface-container-high transition-colors rounded p-1 cursor-pointer text-[20px]">sensors</span>
+<span class="material-symbols-outlined hover:bg-surface-container-high transition-colors rounded p-1 cursor-pointer text-[20px]">settings</span>
+<span class="material-symbols-outlined hover:bg-surface-container-high transition-colors rounded p-1 cursor-pointer text-[20px]">account_circle</span>
+</div>
+</div>
+</nav>
+<!-- Main Layout Workspace -->
+<main class="flex flex-1 relative overflow-hidden">
+<!-- Left Panel: Search & Results (Custom for User View) -->
+<aside class="relative z-10 w-sidebar-width h-full bg-surface-container-low border-r border-outline-variant flex flex-col shadow-2xl shrink-0">
+<!-- Search Inputs -->
+<div class="p-container-padding flex flex-col gap-4 border-b border-outline-variant bg-surface">
+<h2 class="text-headline-md font-headline-md text-on-surface">Find Route</h2>
+<div class="flex flex-col gap-3">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary-container transition-colors text-[18px]">my_location</span>
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-DEFAULT pl-9 pr-3 py-2 text-body-sm font-body-sm focus:border-primary-container focus:outline-none focus:ring-1 focus:ring-primary-container text-on-surface transition-colors placeholder:text-on-surface-variant/50" type="text" value="Current Location"/>
+</div>
+<div class="relative flex items-center justify-center my-[-8px] z-10">
+<button class="bg-surface-container-high border border-outline-variant rounded-full p-1 text-on-surface-variant hover:text-on-surface hover:bg-outline-variant transition-colors">
+<span class="material-symbols-outlined text-[16px]">swap_vert</span>
+</button>
+</div>
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary-container transition-colors text-[18px]">location_on</span>
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-DEFAULT pl-9 pr-3 py-2 text-body-sm font-body-sm focus:border-primary-container focus:outline-none focus:ring-1 focus:ring-primary-container text-on-surface transition-colors placeholder:text-on-surface-variant/50" placeholder="Destination" type="text" value="Sector 7G Node"/>
+</div>
+<button class="mt-1 bg-inverse-primary hover:bg-primary-container text-on-primary-fixed font-label-caps text-label-caps py-2.5 px-4 rounded-DEFAULT transition-colors w-full flex justify-center items-center gap-2 shadow-sm">
+<span class="material-symbols-outlined text-[16px]">directions</span> Find Route
+                    </button>
+</div>
+</div>
+<!-- Route Results -->
+<div class="p-container-padding flex-1 overflow-y-auto flex flex-col gap-4">
+<h3 class="text-label-caps font-label-caps text-on-surface-variant border-b border-outline-variant/50 pb-2">Available Routes</h3>
+<!-- Result Card 1: Fastest (Baseline) -->
+<div class="bg-surface-container-highest border border-outline-variant rounded-lg p-4 cursor-pointer hover:bg-surface-bright transition-colors flex flex-col gap-1 relative overflow-hidden group">
+<div class="flex justify-between items-start">
+<div>
+<div class="text-label-caps font-label-caps text-on-surface-variant mb-1 group-hover:text-on-surface transition-colors">FASTEST FOR YOU</div>
+<div class="text-headline-md font-headline-md text-on-surface">12.2 min</div>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-on-surface-variant transition-colors text-[24px]">route</span>
+</div>
+<div class="text-body-sm font-body-sm text-on-surface-variant/70 mt-1">Shortest individual path. May encounter unpredicted delays.</div>
+</div>
+<!-- Result Card 2: AURA Cooperative (Highlighted) -->
+<div class="bg-primary-container/5 border border-primary-container/40 rounded-lg p-4 cursor-pointer relative flex flex-col gap-3 shadow-[0_0_15px_rgba(77,142,255,0.05)] ring-1 ring-primary-container/20">
+<!-- Active Indicator Line -->
+<div class="absolute top-0 left-0 w-1 h-full bg-primary-container rounded-l-lg"></div>
+<div class="flex justify-between items-start">
+<div>
+<div class="text-label-caps font-label-caps text-primary-container flex items-center gap-1 mb-1">
+<span class="material-symbols-outlined text-[14px]">psychology</span> AURA COOPERATIVE ROUTE
+                            </div>
+<div class="flex items-baseline gap-2">
+<span class="text-headline-md font-headline-md text-on-surface">12.8 min</span>
+<span class="text-data-mono font-data-mono text-tertiary-container bg-tertiary-container/10 px-1.5 py-0.5 rounded">+36s</span>
+</div>
+</div>
+</div>
+<!-- Expanded Detail Section -->
+<div class="mt-1 pt-3 border-t border-primary-container/20 flex flex-col gap-3">
+<div class="flex items-center gap-2 text-body-sm font-body-sm text-on-surface">
+<span class="material-symbols-outlined text-secondary text-[16px]">check_circle</span>
+                            Avoids J7 saturation. Network congestion ↓
+                        </div>
+<!-- Insight Box -->
+<div class="bg-surface-container-lowest/80 p-3 rounded border border-outline-variant/30 text-body-sm font-body-sm text-on-surface-variant leading-relaxed">
+<span class="text-primary-container font-medium block mb-1">Why this route?</span>
+                            By absorbing a minor personal delay (+36s), you actively prevent critical gridlock at Junction 7, improving overall macro-network flow by 4.2%. 
+                        </div>
+<button class="mt-1 w-full bg-primary-container/10 border border-primary-container text-primary-container hover:bg-primary-container hover:text-on-primary-container font-label-caps text-label-caps py-2 px-4 rounded-DEFAULT transition-all duration-200">
+                            Select Route
+                        </button>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Map Canvas -->
+<div class="flex-1 relative bg-background overflow-hidden">
+<!-- Intelligent City Map Background -->
+<div class="absolute inset-0 w-full h-full bg-cover bg-center opacity-60 mix-blend-screen grayscale-[20%]" data-alt="A highly complex, top-down tactical map interface of a sprawling futuristic smart city. The map features a dark mode aesthetic predominantly utilizing deep charcoal and navy blue tones. Intricate grids of roads and infrastructure are illuminated by subtle cyan and electric blue lines representing data flow and traffic telemetry. The scene lacks text but includes abstract geometric markers, glowing nodal points, and soft gradients suggesting varying elevation or density. The mood is analytical, highly technical, and deeply integrated with a cybernetic command center motif." data-location="Neo-Metropolis Grid" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBjdtF_8672WvuqC1kvm_i9Ih5zO6tv5wTlCV2TnrL-WFRQ7oLIV6-Uz3yRbPYotW4pLwgBCB0ZfyHJrLBNfjl6xa6vATTPnZlhUfUfzwsNbWDeJUfSBMP4ujDILPQr3YoOXG8PUZplDornNcdUWgSo7Gbo4teRefxRgvubRO84QYDTI2phgw-MWD6YCPWFh45LgTHwdnGm6N4a9pHtl5w3zsSvqvl010oqphMS4m9W8Scw_RvqMeVS')"></div>
+<!-- Map Vignette/Overlay for legibility -->
+<div class="absolute inset-0 bg-gradient-to-r from-background via-transparent to-transparent opacity-80 pointer-events-none"></div>
+<!-- SVG Data Layer (Simulating routes over the map) -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none z-10" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<filter height="140%" id="glow" width="140%" x="-20%" y="-20%">
+<fegaussianblur result="blur" stddeviation="4"></fegaussianblur>
+<fecomposite in="SourceGraphic" in2="blur" operator="over"></fecomposite>
+</filter>
+</defs>
+<!-- Start Point -->
+<circle cx="20%" cy="60%" fill="#adc6ff" r="6"></circle>
+<circle class="animate-ping" cx="20%" cy="60%" fill="#adc6ff" opacity="0.2" r="14" style="animation-duration: 3s;"></circle>
+<!-- End Point -->
+<circle cx="80%" cy="30%" fill="#4edea3" r="8"></circle>
+<circle cx="80%" cy="30%" fill="#4edea3" opacity="0.1" r="20"></circle>
+<!-- Fastest Route (Dimmed, Gray) -->
+<path d="M 20% 60% C 30% 60%, 40% 50%, 50% 45% S 70% 40%, 80% 30%" fill="none" opacity="0.6" stroke="#424754" stroke-dasharray="6 6" stroke-width="3"></path>
+<!-- AURA Route (Active, Blue, Animated) -->
+<path class="route-pulse" d="M 20% 60% C 30% 75%, 50% 80%, 65% 60% S 75% 40%, 80% 30%" fill="none" filter="url(#glow)" stroke="#4d8eff" stroke-width="4"></path>
+<!-- Congestion Zone Marker (J7) -->
+<circle cx="50%" cy="45%" fill="#93000a" opacity="0.15" r="45"></circle>
+<circle class="animate-pulse" cx="50%" cy="45%" fill="#ffb4ab" opacity="0.3" r="20"></circle>
+<!-- Telemetry Tooltip over congestion -->
+<g transform="translate(50%, 45%)">
+<rect fill="#10131a" height="24" opacity="0.9" rx="2" stroke="#ffb4ab" stroke-width="1" width="100" x="-50" y="-12"></rect>
+<text fill="#ffb4ab" font-family="JetBrains Mono" font-size="10" font-weight="500" letter-spacing="0.05em" text-anchor="middle" x="0" y="3">J7: CRITICAL</text>
+</g>
+</svg>
+<!-- Floating Global Status / Legend -->
+<div class="absolute bottom-8 right-8 bg-surface-container-low/90 backdrop-blur-sm border border-outline-variant p-4 rounded-lg shadow-2xl flex flex-col gap-3 min-w-[240px] z-20">
+<div class="flex items-center justify-between border-b border-outline-variant/50 pb-2">
+<span class="text-label-caps font-label-caps text-on-surface-variant">Telemetry Source</span>
+<div class="flex items-center gap-1.5 px-2 py-0.5 bg-secondary-container/10 border border-secondary/20 rounded">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary shadow-[0_0_5px_#4edea3] animate-pulse"></span>
+<span class="text-data-mono font-data-mono text-secondary text-[10px]">LIVE SYNC</span>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<div class="flex justify-between items-center text-data-mono font-data-mono text-on-surface">
+<span class="text-on-surface-variant text-[11px]">Macro Efficiency</span>
+<span class="text-primary-container">94.2%</span>
+</div>
+<div class="flex justify-between items-center text-data-mono font-data-mono text-on-surface">
+<span class="text-on-surface-variant text-[11px]">Active Reroutes</span>
+<span>1,402</span>
+</div>
+<!-- Legend Mini -->
+<div class="mt-2 pt-2 border-t border-outline-variant/30 flex items-center gap-3">
+<div class="flex items-center gap-1 text-[10px] font-label-caps text-on-surface-variant">
+<span class="w-3 h-0.5 bg-primary-container"></span> AURA
+                        </div>
+<div class="flex items-center gap-1 text-[10px] font-label-caps text-on-surface-variant">
+<span class="w-3 h-0.5 bg-outline-variant border-b border-dashed border-background"></span> Baseline
+                        </div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

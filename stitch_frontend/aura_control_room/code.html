@@ -100,7 +100,6 @@
         .pulsing-border { animation: pulseBorder 2s infinite; }
         @keyframes pulseBorder { 0% { border-color: #4edea3; box-shadow: 0 0 0 0 rgba(78, 222, 163, 0.4); } 70% { border-color: transparent; box-shadow: 0 0 0 4px rgba(78, 222, 163, 0); } 100% { border-color: #4edea3; box-shadow: 0 0 0 0 rgba(78, 222, 163, 0); } }
     </style>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body class="bg-background text-on-surface h-screen overflow-hidden flex flex-col font-body-sm text-body-sm">
 <!-- TopNavBar -->
@@ -130,8 +129,8 @@
 <div class="flex flex-col items-end">
 <span class="text-label-caps font-label-caps text-on-surface-variant">CONNECTION</span>
 <div class="flex items-center gap-1">
-<span class="material-symbols-outlined text-[14px] text-secondary" id="status-icon" style="font-variation-settings: 'FILL' 1;">wifi</span>
-<span id="status" class="text-data-mono font-data-mono text-on-surface">Connecting...</span>
+<span class="material-symbols-outlined text-[14px] text-secondary" style="font-variation-settings: 'FILL' 1;">wifi</span>
+<span class="text-data-mono font-data-mono text-on-surface">Connected</span>
 </div>
 </div>
 </div>
@@ -166,7 +165,28 @@
 <p class="text-label-caps font-label-caps text-on-surface-variant">Live Data Stream</p>
 </div>
 </div>
-<div id="junctions-list" class="flex-1 py-4 flex flex-col gap-2 overflow-y-auto px-2"></div>
+<nav class="flex-1 py-4 flex flex-col gap-1 overflow-y-auto">
+<a class="bg-secondary-container text-on-secondary-container rounded-lg mx-2 px-3 py-2 flex items-center gap-3 transition-transform duration-75 hover:bg-surface-container-highest" href="#">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">map</span>
+<span class="text-label-caps font-label-caps">Map</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest mx-2 rounded-lg px-3 py-2 flex items-center gap-3 transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]">traffic</span>
+<span class="text-label-caps font-label-caps">Junctions</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest mx-2 rounded-lg px-3 py-2 flex items-center gap-3 transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]">alt_route</span>
+<span class="text-label-caps font-label-caps">Routing</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest mx-2 rounded-lg px-3 py-2 flex items-center gap-3 transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]">analytics</span>
+<span class="text-label-caps font-label-caps">Analytics</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest mx-2 rounded-lg px-3 py-2 flex items-center gap-3 transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]">history</span>
+<span class="text-label-caps font-label-caps">History</span>
+</a>
+</nav>
 <div class="p-4 border-t border-outline-variant mt-auto">
 <button class="w-full bg-inverse-primary text-on-primary h-8 rounded flex justify-center items-center text-label-caps font-label-caps hover:bg-primary-container transition-colors mb-4">Start Simulation</button>
 <div class="flex flex-col gap-1">
@@ -191,15 +211,15 @@
 </div>
 <div class="flex-1 border border-outline-variant bg-surface-container-low rounded p-2 flex items-center justify-between">
 <span class="text-label-caps font-label-caps text-on-surface-variant flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">timer</span> Avg Delay</span>
-<span id="metric-delay" class="text-data-mono font-data-mono text-on-surface">--s</span>
+<span class="text-data-mono font-data-mono text-on-surface">18.2s</span>
 </div>
 <div class="flex-1 border border-outline-variant bg-surface-container-low rounded p-2 flex items-center justify-between">
 <span class="text-label-caps font-label-caps text-on-surface-variant flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">queue</span> Max Demand</span>
-<span id="metric-demand" class="text-data-mono font-data-mono text-tertiary">-- PCU</span>
+<span class="text-data-mono font-data-mono text-tertiary">24.5 PCU</span>
 </div>
 <div class="flex-1 border border-outline-variant bg-surface-container-low rounded p-2 flex items-center justify-between">
 <span class="text-label-caps font-label-caps text-on-surface-variant flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">warning</span> Spillbacks</span>
-<span id="metric-spillbacks" class="text-data-mono font-data-mono text-error">--</span>
+<span class="text-data-mono font-data-mono text-error">2</span>
 </div>
 <div class="flex-1 border border-outline-variant bg-surface-container-low rounded p-2 flex items-center justify-between">
 <span class="text-label-caps font-label-caps text-on-surface-variant flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">low_priority</span> Priority</span>
@@ -210,51 +230,156 @@
 <div class="flex flex-1 overflow-hidden relative">
 <!-- Map Area -->
 <div class="flex-1 relative bg-surface-container-lowest map-grid overflow-hidden border-r border-outline-variant" data-location="Kochi" style="">
-<div id="map" class="w-full h-full z-10 absolute inset-0"></div>
-<!-- SVG removed -->
-
-<!-- Right Drawer -->
-<div class="w-[340px] bg-surface flex flex-col shrink-0 overflow-y-auto z-20">
-    <div class="p-4 border-b border-outline-variant flex flex-col bg-surface-container-low">
-        <h3 class="text-body-md font-body-md font-bold text-on-surface mb-4">Routing Engine</h3>
-        <div class="flex flex-col gap-2">
-            <label class="text-label-caps text-on-surface-variant">Origin: 
-                <select id="route-origin" class="w-full bg-surface-container-highest border border-outline-variant rounded p-1 text-on-surface mt-1">
-                    <option value="J1">J1 Edappally</option>
-                    <option value="J2">J2 Palarivattom</option>
-                    <option value="J3">J3 Vyttila</option>
-                    <option value="J4">J4 Kundanoor</option>
-                    <option value="J5">J5 Kakkanad</option>
-                    <option value="J6">J6 Tripunithura</option>
-                </select>
-            </label>
-            <label class="text-label-caps text-on-surface-variant">Dest: 
-                <select id="route-dest" class="w-full bg-surface-container-highest border border-outline-variant rounded p-1 text-on-surface mt-1">
-                    <option value="J3" selected>J3 Vyttila</option>
-                    <option value="J4">J4 Kundanoor</option>
-                    <option value="J1">J1 Edappally</option>
-                </select>
-            </label>
-            <button onclick="requestRoute()" class="mt-2 bg-inverse-primary text-on-primary rounded py-1.5 text-label-caps hover:bg-primary-container transition-colors">Find Route</button>
-        </div>
-    </div>
-    <div id="route-results" class="p-4 flex flex-col gap-4 overflow-y-auto"></div>
+<div class="absolute inset-0 flex items-center justify-center opacity-30 text-outline-variant text-[200px] pointer-events-none select-none">
+<span class="material-symbols-outlined text-[200px]">map</span>
+</div>
+<!-- SVG Overlay for Roads -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 1;">
+<path d="M 100 200 L 400 200 L 600 400 L 800 400" fill="none" stroke="#32353c" stroke-width="4"></path>
+<path d="M 400 50 L 400 500" fill="none" stroke="#32353c" stroke-width="4"></path>
+<path d="M 600 100 L 600 600" fill="none" stroke="#32353c" stroke-width="4"></path>
+<!-- Animated Traffic Flow (Simulated with dashes) -->
+<path class="animate-[dash_2s_linear_infinite]" d="M 100 200 L 400 200" fill="none" stroke="#4edea3" stroke-dasharray="4 8" stroke-width="2"></path>
+</svg>
+<!-- Junction J1 -->
+<div class="absolute top-[180px] left-[380px] z-10">
+<div class="w-10 h-10 bg-surface border border-outline-variant rounded-full flex items-center justify-center pulsing-border shadow-[0_0_15px_rgba(78,222,163,0.2)]">
+<span class="text-label-caps font-label-caps text-on-surface">J1</span>
+</div>
+<div class="mt-1 bg-surface-container-high border border-outline-variant rounded px-1 flex flex-col items-center">
+<div class="w-2 h-2 rounded-full bg-secondary my-1 shadow-[0_0_5px_#4edea3]"></div>
+<span class="text-[8px] font-data-mono text-on-surface-variant">42%</span>
+</div>
+</div>
+<!-- Back-Pressure Visual Near J1 -->
+<div class="absolute top-[230px] left-[390px] z-10 flex flex-col items-center opacity-70">
+<span class="material-symbols-outlined text-tertiary text-[16px] animate-bounce">arrow_downward</span>
+<span class="text-[8px] font-data-mono text-tertiary">BP 0.9</span>
+</div>
+<!-- Junction J2 -->
+<div class="absolute top-[380px] left-[580px] z-10">
+<div class="w-10 h-10 bg-surface border border-error rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(255,180,171,0.2)]">
+<span class="text-label-caps font-label-caps text-on-surface">J2</span>
+</div>
+<div class="mt-1 bg-surface-container-high border border-outline-variant rounded px-1 flex flex-col items-center">
+<div class="w-2 h-2 rounded-full bg-error my-1 shadow-[0_0_5px_#ffb4ab]"></div>
+<span class="text-[8px] font-data-mono text-error">88%</span>
+</div>
+</div>
+</div>
+<!-- Right Drawer (Junction Detail) -->
+<div class="w-[340px] bg-surface flex flex-col shrink-0 overflow-y-auto">
+<div class="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-container-low">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">traffic</span>
+<h3 class="text-body-md font-body-md font-bold text-on-surface">J1 Vyttila</h3>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface"><span class="material-symbols-outlined text-[18px]">close</span></button>
+</div>
+<div class="p-4 flex flex-col gap-4">
+<!-- Phase Info -->
+<div class="border border-outline-variant rounded bg-surface-container-lowest p-3">
+<div class="flex justify-between items-center mb-2">
+<span class="text-label-caps font-label-caps text-on-surface-variant">CURRENT PHASE</span>
+<span class="text-data-mono font-data-mono text-secondary">PHASE 2 (E-W)</span>
+</div>
+<div class="w-full bg-surface-container-high h-1 rounded overflow-hidden">
+<div class="bg-secondary h-full w-[45%]"></div>
+</div>
+<div class="flex justify-between mt-1">
+<span class="text-[9px] font-data-mono text-on-surface-variant">0s</span>
+<span class="text-[9px] font-data-mono text-on-surface-variant">12s rem</span>
+<span class="text-[9px] font-data-mono text-on-surface-variant">45s max</span>
+</div>
+</div>
+<!-- Data Tables -->
+<div class="border border-outline-variant rounded bg-surface-container-lowest overflow-hidden">
+<div class="bg-surface-container-low px-3 py-1.5 border-b border-outline-variant">
+<span class="text-label-caps font-label-caps text-on-surface-variant">SIGNAL STATE &amp; DEMAND</span>
+</div>
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant text-[9px] font-label-caps text-on-surface-variant bg-surface-container-low">
+<th class="p-2 font-normal">DIR</th>
+<th class="p-2 font-normal">STATE</th>
+<th class="p-2 font-normal text-right">DEMAND (PCU)</th>
+<th class="p-2 font-normal text-right">QUEUE</th>
+</tr>
+</thead>
+<tbody class="text-data-mono font-data-mono">
+<tr class="border-b border-outline-variant bg-[#161B22]">
+<td class="p-2 text-on-surface">North</td>
+<td class="p-2"><div class="w-2 h-2 rounded-full bg-error"></div></td>
+<td class="p-2 text-right text-on-surface">14.2</td>
+<td class="p-2 text-right text-tertiary">8</td>
+</tr>
+<tr class="border-b border-outline-variant bg-[#11161D]">
+<td class="p-2 text-on-surface">East</td>
+<td class="p-2"><div class="w-2 h-2 rounded-full bg-secondary shadow-[0_0_5px_#4edea3]"></div></td>
+<td class="p-2 text-right text-on-surface">32.1</td>
+<td class="p-2 text-right text-on-surface">3</td>
+</tr>
+<tr class="bg-[#161B22]">
+<td class="p-2 text-on-surface">South</td>
+<td class="p-2"><div class="w-2 h-2 rounded-full bg-error"></div></td>
+<td class="p-2 text-right text-on-surface">11.0</td>
+<td class="p-2 text-right text-on-surface">5</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Metrics Grid -->
+<div class="grid grid-cols-2 gap-2">
+<div class="border border-outline-variant rounded bg-surface-container-lowest p-2 flex flex-col">
+<span class="text-label-caps font-label-caps text-on-surface-variant mb-1">DOWNSTREAM UTIL</span>
+<span class="text-data-mono font-data-mono text-tertiary">71%</span>
+</div>
+<div class="border border-outline-variant rounded bg-surface-container-lowest p-2 flex flex-col">
+<span class="text-label-caps font-label-caps text-on-surface-variant mb-1">BACK-PRESSURE</span>
+<span class="text-data-mono font-data-mono text-on-surface">x0.90</span>
+</div>
+<div class="border border-outline-variant rounded bg-surface-container-lowest p-2 flex flex-col col-span-2">
+<span class="text-label-caps font-label-caps text-on-surface-variant mb-1">GREEN WAVE OFFSET</span>
+<div class="flex items-center gap-2">
+<span class="text-data-mono font-data-mono text-secondary">+4s</span>
+<span class="text-[10px] text-on-surface-variant">Syncing with J2</span>
+</div>
+</div>
+</div>
+</div>
+</div>
 </div>
 <!-- Bottom Section (Timeline & Controls) -->
-
 <div class="h-48 border-t border-outline-variant bg-surface flex shrink-0">
 <!-- Event Timeline -->
-
 <div class="flex-1 flex flex-col border-r border-outline-variant">
-    <div class="bg-surface-container-low px-4 py-2 border-b border-outline-variant flex items-center justify-between shrink-0">
-        <span class="text-label-caps font-label-caps text-on-surface-variant">GREEN WAVE OFFSETS</span>
-    </div>
-    <div id="green-wave-panel" class="flex-1 overflow-y-auto p-2 flex gap-4 p-4">
-        <!-- Populated by app.js -->
-    </div>
+<div class="bg-surface-container-low px-4 py-2 border-b border-outline-variant flex items-center justify-between shrink-0">
+<span class="text-label-caps font-label-caps text-on-surface-variant">WHY AURA ACTED (EVENT LOG)</span>
+<button class="text-[10px] uppercase text-primary hover:underline">Export</button>
+</div>
+<div class="flex-1 overflow-y-auto p-2">
+<table class="w-full text-left border-collapse">
+<tbody class="text-data-mono font-data-mono">
+<tr class="hover:bg-surface-container-high transition-colors">
+<td class="p-2 w-24 text-on-surface-variant text-[11px]">10:42:15</td>
+<td class="p-2 w-8"><span class="material-symbols-outlined text-[14px] text-tertiary">trending_up</span></td>
+<td class="p-2 text-on-surface">Queue build-up detected at J2 (South approach).</td>
+</tr>
+<tr class="hover:bg-surface-container-high transition-colors">
+<td class="p-2 w-24 text-on-surface-variant text-[11px]">10:42:16</td>
+<td class="p-2 w-8"><span class="material-symbols-outlined text-[14px] text-secondary">memory</span></td>
+<td class="p-2 text-on-surface">AURA adjusted J1 Phase 2 offset by +4s to relieve back-pressure.</td>
+</tr>
+<tr class="hover:bg-surface-container-high transition-colors">
+<td class="p-2 w-24 text-on-surface-variant text-[11px]">10:38:05</td>
+<td class="p-2 w-8"><span class="material-symbols-outlined text-[14px] text-primary">directions_car</span></td>
+<td class="p-2 text-on-surface">Platoon identified en route to J4. Green wave initiated.</td>
+</tr>
+</tbody>
+</table>
+</div>
 </div>
 <!-- Control Panel -->
-
 <div class="w-[340px] flex flex-col bg-surface-container-lowest shrink-0">
 <div class="bg-surface-container-low px-4 py-2 border-b border-outline-variant shrink-0">
 <span class="text-label-caps font-label-caps text-on-surface-variant">GLOBAL CONTROLS</span>
@@ -281,6 +406,4 @@
 </div>
 </main>
 </div>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="app.js"></script>
 </body></html>
