@@ -210,22 +210,36 @@ class RoutingEngine {
             const nearest = this.findNearestEdge(origin.lat, origin.lng);
             // Configurable threshold: 1000 meters
             if (!nearest.edge || nearest.distMeters > 1000) {
-                return { error: "Please choose a location on or near a road." };
+                return { error: "Please choose a starting location on or near a road." };
             }
             originNodeId = nearest.edge.to;
-            // Add the segment from the projected point to the edge's target node
             const targetNode = this.graph.nodes.find(n => n.id === nearest.edge.to);
             if (targetNode && nearest.projPoint) {
-                projectedStartGeometry = [nearest.projPoint, [targetNode.y, targetNode.x]];
+                projectedStartGeometry = [nearest.projPoint, [targetNode.lat, targetNode.lng]];
+            }
+        }
+
+        let destNodeId = destination;
+        let projectedEndGeometry = null;
+
+        if (typeof destination === 'object' && destination.lat && destination.lng) {
+            const nearestDest = this.findNearestEdge(destination.lat, destination.lng);
+            if (!nearestDest.edge || nearestDest.distMeters > 1000) {
+                return { error: "Please choose a destination on or near a road." };
+            }
+            destNodeId = nearestDest.edge.from;
+            const fromNode = this.graph.nodes.find(n => n.id === nearestDest.edge.from);
+            if (fromNode && nearestDest.projPoint) {
+                projectedEndGeometry = [[fromNode.lat, fromNode.lng], nearestDest.projPoint];
             }
         }
         
-        const individual = this.dijkstra(originNodeId, destination, networkState, false);
-        const aura = this.dijkstra(originNodeId, destination, networkState, true);
+        const individual = this.dijkstra(originNodeId, destNodeId, networkState, false);
+        const aura = this.dijkstra(originNodeId, destNodeId, networkState, true);
 
         // Name bottleneck node if it's a controlled junction
         let bNodeName = individual.bottleneckNode;
-        const bJunc = this.graph.controlledJunctions.find(j => j.id === individual.bottleneckNode);
+        const bJunc = this.graph.controlledJunctions.find(j => j.id === individual.bottleneckNode || j.osmNodeId === individual.bottleneckNode);
         if (bJunc) bNodeName = bJunc.name;
         
         if (individual.route.join('->') !== aura.route.join('->')) {
@@ -234,7 +248,7 @@ class RoutingEngine {
             aura.explanation = `Network has capacity. No routing diversion needed.`;
         }
 
-            // Return full geometry and POI info for frontend rendering
+        // Return full geometry and POI info for frontend rendering
         const enhanceRoute = (rResult) => {
             let geom = [];
             if (projectedStartGeometry) {
@@ -244,12 +258,15 @@ class RoutingEngine {
             let controlledJunctionsPassed = [];
             for (let i = 0; i < rResult.route.length - 1; i++) {
                 const e = (this.adj[rResult.route[i]] || []).find(edge => edge.to === rResult.route[i+1]);
-                if (e) {
+                if (e && e.geometry) {
                     geom.push(...e.geometry);
                 }
                 
-                const cj = this.graph.controlledJunctions.find(j => j.osmNodeId === rResult.route[i+1]);
+                const cj = this.graph.controlledJunctions.find(j => j.osmNodeId === rResult.route[i+1] || j.id === rResult.route[i+1]);
                 if (cj) controlledJunctionsPassed.push({ id: cj.id, name: cj.name });
+            }
+            if (projectedEndGeometry) {
+                geom.push(...projectedEndGeometry);
             }
             rResult.geometry = geom;
             rResult.controlledJunctionsPassed = controlledJunctionsPassed;

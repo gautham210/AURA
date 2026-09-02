@@ -17,6 +17,12 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #484f58; }
         
+        /* Leaflet DivIcon reset to prevent alignment displacement */
+        .leaflet-div-icon {
+            background: transparent !important;
+            border: none !important;
+        }
+
         /* High-contrast dark OpenStreetMap tile filter - 100% Keyless, zero watermarks */
         .leaflet-container { background: #07090e !important; }
         .osm-dark-tiles .leaflet-tile {
@@ -55,7 +61,7 @@
         /* Queue blip animations */
         @keyframes blip-glow {
             0%, 100% { transform: scale(1); opacity: 0.9; }
-            50% { transform: scale(1.2); opacity: 1; }
+            50% { transform: scale(1.18); opacity: 1; }
         }
         .queue-blip { animation: blip-glow 1.5s ease-in-out infinite; }
 
@@ -75,7 +81,7 @@
                 </div>
                 <div class="flex flex-col">
                     <span class="text-base font-bold text-white tracking-tight leading-none">AURA <span class="text-[#3B82F6] font-semibold text-xs ml-1">Kochi Network</span></span>
-                    <span class="text-[9px] font-mono text-[#8b949e] uppercase tracking-wider">Adaptive Urban Routing</span>
+                    <span class="text-[9px] font-mono text-[#8b949e] uppercase tracking-wider">Adaptive Urban Routing Architecture</span>
                 </div>
             </div>
             
@@ -130,8 +136,9 @@
                 <span id="metric-demand" class="font-mono text-sm font-bold text-[#F59E0B]">-- PCU</span>
             </div>
             <div class="w-px h-4 bg-[#30363d]"></div>
-            <div class="flex items-center gap-3">
-                <span class="text-[#8b949e] text-[10px] font-bold tracking-widest uppercase">Spillback Events</span>
+            <!-- Spillback Events with descriptive tooltip -->
+            <div class="flex items-center gap-3 group relative cursor-help" title="Times a queue reached the upstream boundary of an approach.">
+                <span class="text-[#8b949e] text-[10px] font-bold tracking-widest uppercase border-b border-dotted border-[#8b949e]/60">Spillback Events</span>
                 <span id="metric-spillbacks" class="font-mono text-sm font-bold text-[#EF4444]">--</span>
             </div>
             <div class="w-px h-4 bg-[#30363d]"></div>
@@ -141,8 +148,8 @@
             </div>
             <div class="flex-1"></div>
             <div class="flex items-center gap-2">
-                <span class="text-[10px] font-mono text-[#8b949e]">EMERGENCY POIs:</span>
-                <span class="text-[10px] font-mono text-white bg-[#161b22] px-2 py-0.5 rounded border border-[#30363d]">🏥 86 Hospitals · 🚒 2 Fire · 👮 18 Police</span>
+                <span class="text-[10px] font-mono text-[#8b949e]">HOSPITALS & RESCUE:</span>
+                <span id="poi-summary-badge" class="text-[10px] font-mono text-white bg-[#161b22] px-2 py-0.5 rounded border border-[#30363d]">🏥 57 Hospitals</span>
             </div>
         </div>
 
@@ -328,9 +335,15 @@
                         
                         <!-- Destination Section -->
                         <div class="flex flex-col gap-1.5">
-                            <div class="text-[10px] font-bold text-[#8b949e] uppercase tracking-widest">Destination</div>
+                            <div class="text-[10px] font-bold text-[#8b949e] uppercase tracking-widest flex items-center justify-between">
+                                <span>Destination</span>
+                                <button id="btn-map-dest" class="text-[9px] text-[#60A5FA] hover:underline">PICK ON MAP</button>
+                            </div>
                             <select id="user-destination" class="w-full bg-[#161b22] border border-[#30363d] rounded-md px-3 py-2.5 text-xs font-medium text-white outline-none focus:border-[#3B82F6] shadow-inner transition-colors">
                             </select>
+                            <div id="dest-display" class="text-xs font-mono text-[#60A5FA] px-3 py-1.5 bg-[#1E3A8A]/20 rounded border border-[#3B82F6]/30 hidden mt-1">
+                                Destination selected on map.
+                            </div>
                         </div>
                     </div>
                     
@@ -356,7 +369,7 @@
                                 <div class="text-[10px] font-mono font-bold text-[#10B981] bg-[#10B981]/20 px-2 py-0.5 rounded border border-[#10B981]/30" id="aura-diff">OPTIMAL FLOW</div>
                             </div>
                             <div class="text-[11px] text-[#8b949e] font-mono font-medium flex flex-col gap-1 mb-2.5">
-                                <span class="text-[#e6edf3] font-semibold text-[10px]">CORRIDOR JUNCTIONS:</span>
+                                <span class="text-[#e6edf3] font-semibold text-[10px]">CORRIDOR PASSAGE:</span>
                                 <div id="aura-path" class="flex flex-wrap gap-1 text-xs">--</div>
                             </div>
                             
