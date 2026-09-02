@@ -1,68 +1,15 @@
-body {
-    margin: 0;
-    padding: 0;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    background: #1e1e1e;
-    color: #fff;
-}
-
-#header {
-    background: #2d2d2d;
-    padding: 10px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #444;
-}
-
-h1 {
-    margin: 0;
-    font-size: 1.5rem;
-    color: #4CAF50;
-}
-
-#status {
-    font-weight: bold;
-    color: #f44336;
-}
-
-#container {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-}
-
-#map {
-    flex: 2;
-    height: 100%;
-}
-
-#sidebar {
-    flex: 1;
-    padding: 20px;
-    overflow-y: auto;
-    background: #2d2d2d;
-    border-left: 1px solid #444;
-}
-
-.junction-card {
-    background: #3d3d3d;
-    padding: 15px;
-    margin-bottom: 15px;
-    border-radius: 8px;
-}
-
-.junction-card h3 {
-    margin-top: 0;
-    color: #64B5F6;
-}
-
-.approach-list {
-    font-size: 0.9rem;
-}
-.approach-item {
-    margin-bottom: 5px;
-}
+body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; height: 100vh; background: #1e1e1e; color: #fff; }
+#header { background: #2d2d2d; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; }
+h1 { margin: 0; font-size: 1.5rem; color: #4CAF50; }
+#status { font-weight: bold; color: #f44336; }
+#container { display: flex; flex: 1; overflow: hidden; }
+#map { flex: 2; height: 100%; }
+#sidebar { flex: 1.5; padding: 20px; overflow-y: auto; background: #2d2d2d; border-left: 1px solid #444; }
+.junction-card { background: #3d3d3d; padding: 15px; margin-bottom: 15px; border-radius: 8px; }
+.junction-card h3 { margin-top: 0; color: #64B5F6; }
+.comparison { display: flex; gap: 10px; }
+.aura-col, .baseline-col { flex: 1; background: #2a2a2a; padding: 10px; border-radius: 4px; }
+.aura-col h4 { color: #4CAF50; margin-top: 0; }
+.baseline-col h4 { color: #ff9800; margin-top: 0; }
+.approach-item { margin-bottom: 5px; font-size: 0.85rem; }
+.metrics { margin-top: 10px; font-size: 0.9rem; border-top: 1px solid #555; padding-top: 10px; }

@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const { SimulationSensor } = require('./trafficSensors');
+const { TrafficEngine, BaselineController } = require('./trafficEngine');
 
 const app = express();
 app.use(cors());
@@ -20,6 +21,16 @@ const sensor = new SimulationSensor("AURA_DEMO_SEED");
 
 const junctionIds = graph.junctions.map(j => j.id);
 const approaches = ["NORTHBOUND", "SOUTHBOUND", "EASTBOUND", "WESTBOUND"];
+const phases = [["NORTHBOUND", "SOUTHBOUND"], ["EASTBOUND", "WESTBOUND"]];
+
+const engineConfig = { C: 60, lost_time: 6, G_min: 10, gap_out_seconds: 5, S: 0.5 };
+const aura = new TrafficEngine(engineConfig);
+const baseline = new BaselineController(engineConfig);
+
+junctionIds.forEach(jid => {
+    aura.initJunction(jid, phases);
+    baseline.initJunction(jid, phases);
+});
 
 let connectedClients = new Set();
 
@@ -40,32 +51,47 @@ wss.on('connection', (ws) => {
 });
 
 // Simulation Tick (1 Hz)
+let tickCounter = 0;
 setInterval(() => {
     sensor.tick(junctionIds, approaches);
+    tickCounter++;
 
-    const junctionsState = junctionIds.map(jid => {
-        let approachesState = {};
+    junctionIds.forEach(jid => {
+        let arrivals = {};
+        let sourceModes = {};
         approaches.forEach(appr => {
             const state = sensor.getApproachState(jid, appr);
-            const pcu = state.counts.two_wheeler * 0.5 + 
-                        state.counts.auto_rickshaw * 1.0 + 
-                        state.counts.car * 1.0 + 
-                        state.counts.bus * 3.0;
+            arrivals[appr] = { counts: state.counts };
+            sourceModes[appr] = state.sourceMode;
+        });
 
-            approachesState[appr] = {
-                signal_state: Math.random() > 0.5 ? "GREEN" : "RED", 
-                queue_pcu: pcu, 
-                max_queue_pcu: 25.0, 
-                avg_delay_seconds: 15.0, 
-                counts: state.counts,
-                source_mode: state.sourceMode
-            };
+        // Mock downstream utilization to test spillback counting over time
+        const util = 0.5 + 0.5 * Math.sin(tickCounter * 0.1); // oscillates between 0 and 1
+        aura.updateBackPressure(jid, util); 
+
+        aura.tick(jid, arrivals);
+        baseline.tick(jid, arrivals);
+
+        Object.keys(sourceModes).forEach(appr => {
+            aura.state[jid].approaches[appr].source_mode = sourceModes[appr];
+        });
+    });
+
+    const junctionsState = junctionIds.map(jid => {
+        const auraState = aura.getJunctionState(jid);
+        const baselineState = baseline.getJunctionState(jid);
+
+        approaches.forEach(appr => {
+            const sm = aura.state[jid].approaches[appr].source_mode;
+            if(auraState.approaches[appr]) auraState.approaches[appr].source_mode = sm;
+            if(baselineState.approaches[appr]) baselineState.approaches[appr].source_mode = sm;
         });
 
         return {
             junction_id: jid,
-            current_phase: 1,
-            approaches: approachesState
+            current_phase: auraState.current_phase,
+            aura: auraState,
+            baseline: baselineState
         };
     });
 
@@ -85,5 +111,5 @@ setInterval(() => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`AURA Phase 1 server running on http://localhost:${PORT}`);
+    console.log(`AURA Phase 2 server running on http://localhost:${PORT}`);
 });
