@@ -23,11 +23,28 @@ class AuraStateStore {
     updateTrafficState(stateData) {
         this.networkState = stateData.junctions || [];
         this.greenWave = stateData.green_wave || {};
+        this.visionReplay = stateData.vision_replay || { active: false };
         
         updateTopMetrics(this.networkState);
         updateMapMarkers(this.networkState);
         updateGreenWavePanel(this.greenWave);
         updateDataSourceLabel(this.networkState);
+
+        // Update Header CCTV Replay Badge
+        const badgeReplay = document.getElementById('badge-cctv-replay');
+        const targetReplay = document.getElementById('cctv-replay-target');
+        if (badgeReplay && this.visionReplay) {
+            if (this.visionReplay.active) {
+                badgeReplay.classList.remove('hidden');
+                badgeReplay.classList.add('flex');
+                if (targetReplay) {
+                    targetReplay.textContent = `${this.visionReplay.junction_id || 'J1'} ${this.visionReplay.approach_direction || 'NORTHBOUND'}`;
+                }
+            } else {
+                badgeReplay.classList.add('hidden');
+                badgeReplay.classList.remove('flex');
+            }
+        }
         
         if (this.currentMode === 'CONTROL_ROOM' && this.selectedJunctionId) {
             renderJunctionDetail(this.selectedJunctionId);
@@ -550,15 +567,21 @@ function renderJunctionDetail(id) {
             const appState = jState.aura.approaches[dir];
             if (appState) {
                 const isGreen = appState.signal_state === "GREEN";
+                const isReplay = appState.source_mode === "REPLAY";
                 const sigBadge = isGreen ? "bg-[#10B981]/20 text-[#10B981] border-[#10B981]/40" : "bg-[#EF4444]/20 text-[#EF4444] border-[#EF4444]/40";
-                const modeBadge = appState.source_mode === "LIVE" ? "text-[#10B981]" : (appState.source_mode === "REPLAY" ? "text-[#F59E0B]" : "text-[#8b949e]");
+                const modeBadge = isReplay 
+                    ? "bg-[#3B82F6]/20 text-[#60A5FA] border-[#3B82F6]/50 animate-pulse font-bold" 
+                    : (appState.source_mode === "LIVE" ? "text-[#10B981]" : "text-[#8b949e]");
+                const rowBorder = isReplay 
+                    ? "border-[#3B82F6]/60 shadow-[0_0_10px_rgba(59,130,246,0.25)] bg-[#0d1117]" 
+                    : "border-[#30363d] bg-[#0d1117]";
 
                 const html = `
-                    <div class="bg-[#0d1117] border border-[#30363d] rounded-md p-2.5 flex justify-between items-center shadow-sm">
+                    <div class="${rowBorder} border rounded-md p-2.5 flex justify-between items-center shadow-sm">
                         <div class="flex items-center gap-2.5">
                             <span class="text-[10px] font-mono font-bold text-[#8b949e] w-14">${dir.substring(0,5)}</span>
                             <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded border ${sigBadge}">${appState.signal_state}</span>
-                            <span class="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#161b22] border border-[#30363d] ${modeBadge}">${appState.source_mode || 'SIM'}</span>
+                            <span class="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border ${modeBadge}">${appState.source_mode || 'SIM'}</span>
                         </div>
                         <div class="flex items-center gap-4 font-mono text-xs">
                             <div class="flex flex-col items-end">
@@ -594,24 +617,47 @@ function renderJunctionDetail(id) {
 
     let primarySource = "SIMULATED";
     let totalPcu = 0;
+    let hasReplayAppr = false;
     if (jState.aura.approaches) {
         dirs.forEach(dir => {
             const a = jState.aura.approaches[dir];
             if (a) {
                 if (a.source_mode === "LIVE") primarySource = "LIVE";
-                else if (a.source_mode === "REPLAY" && primarySource !== "LIVE") primarySource = "REPLAY";
+                else if (a.source_mode === "REPLAY") {
+                    primarySource = "REPLAY";
+                    hasReplayAppr = true;
+                }
                 totalPcu += (a.queue_pcu || 0);
             }
         });
     }
 
+    const evBadge = document.getElementById('ev-badge');
     const evSource = document.getElementById('ev-source');
+    const evApproach = document.getElementById('ev-approach');
+    const evModel = document.getElementById('ev-model');
     const evPcu = document.getElementById('ev-pcu');
-    const evTimestamp = document.getElementById('ev-timestamp');
 
-    if (evSource) evSource.textContent = primarySource;
-    if (evPcu) evPcu.textContent = `${totalPcu.toFixed(1)} PCU`;
-    if (evTimestamp) evTimestamp.textContent = new Date().toLocaleTimeString();
+    if (id === 'J1' && (hasReplayAppr || (store.visionReplay && store.visionReplay.active && store.visionReplay.junction_id === 'J1'))) {
+        if (evBadge) {
+            evBadge.textContent = "REPLAY (ACTIVE)";
+            evBadge.className = "text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#3B82F6]/20 text-[#60A5FA] border border-[#3B82F6]/40 animate-pulse";
+        }
+        if (evSource) evSource.textContent = "REPLAY (vision/traffic.mp4)";
+        if (evApproach) evApproach.textContent = "NORTHBOUND (Assigned to J1)";
+        if (evModel) evModel.textContent = "UVH-26 YOLOv11-S + ByteTrack";
+        const nbQ = jState.aura.approaches['NORTHBOUND'] ? jState.aura.approaches['NORTHBOUND'].queue_pcu : 0;
+        if (evPcu) evPcu.textContent = `${nbQ.toFixed(1)} PCU (Live Replay Batch)`;
+    } else {
+        if (evBadge) {
+            evBadge.textContent = primarySource;
+            evBadge.className = "text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#21262d] text-[#8b949e] border border-[#30363d]";
+        }
+        if (evSource) evSource.textContent = primarySource;
+        if (evApproach) evApproach.textContent = "ALL (SIMULATED)";
+        if (evModel) evModel.textContent = "Synthetic Flow Generator";
+        if (evPcu) evPcu.textContent = `${totalPcu.toFixed(1)} PCU`;
+    }
 
     // Counterfactual Baseline Benchmark (Offline Reference Comparison Only)
     const cf = jState.counterfactual || (jState.aura && jState.aura.counterfactual);

@@ -45,11 +45,41 @@ junctionIds.forEach(jid => {
     baseline.initJunction(jid, phases);
 });
 
-// Vision endpoint
+let latestVisionTelemetry = {
+    active: false,
+    junction_id: null,
+    approach_direction: null,
+    detections: {},
+    pcu: 0,
+    source_mode: "SIMULATED",
+    lastSeen: 0
+};
+
+// Vision endpoint (UVH-26 CCTV Replay Ingestion)
 app.post('/vision-update', (req, res) => {
+    if (!req.body || !req.body.data) {
+        return res.status(400).json({ error: "Missing data payload" });
+    }
     const { junction_id, approach_direction, detections, calculated_pcu, source_mode } = req.body.data;
-    sensor.injectVisionData(junction_id, approach_direction, { counts: detections }, source_mode || "LIVE");
-    res.json({ status: 'ok' });
+    const mode = source_mode || "REPLAY";
+    sensor.injectVisionData(junction_id, approach_direction, { counts: detections || {} }, mode);
+
+    let pcu = calculated_pcu;
+    if (pcu === undefined && detections) {
+        pcu = aura.calculatePCU(detections);
+    }
+
+    latestVisionTelemetry = {
+        active: true,
+        junction_id: junction_id,
+        approach_direction: approach_direction,
+        detections: detections || {},
+        pcu: +(Number(pcu || 0).toFixed(1)),
+        source_mode: mode,
+        lastSeen: Date.now()
+    };
+
+    res.json({ status: 'ok', junction_id, approach_direction, source_mode: mode, pcu: latestVisionTelemetry.pcu });
 });
 
 let connectedClients = new Set();
@@ -197,12 +227,24 @@ setInterval(() => {
 
     latestNetworkState = junctionsState;
 
+    const isVisionActive = (Date.now() - latestVisionTelemetry.lastSeen < 2500);
+    const visionReplayStatus = {
+        active: isVisionActive,
+        junction_id: isVisionActive ? latestVisionTelemetry.junction_id : null,
+        approach_direction: isVisionActive ? latestVisionTelemetry.approach_direction : null,
+        source_mode: isVisionActive ? latestVisionTelemetry.source_mode : "SIMULATED",
+        pcu: isVisionActive ? latestVisionTelemetry.pcu : 0,
+        detections: isVisionActive ? latestVisionTelemetry.detections : {},
+        lastSeen: latestVisionTelemetry.lastSeen
+    };
+
     const payload = {
         event: "SIMULATED_TRAFFIC_STATE",
         timestamp: new Date().toISOString(),
         data: { 
             junctions: junctionsState,
-            green_wave: getGreenWaveStates()
+            green_wave: getGreenWaveStates(),
+            vision_replay: visionReplayStatus
         }
     };
 

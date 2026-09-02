@@ -364,7 +364,8 @@ class TrafficEngine {
                     signal_state: aState.signalState, // Authoritative RED or GREEN
                     queue_pcu: +(aState.q.toFixed(2)),
                     max_queue_pcu: +(aState.max_q.toFixed(2)),
-                    avg_delay_seconds: +(avgDelay.toFixed(1))
+                    avg_delay_seconds: +(avgDelay.toFixed(1)),
+                    source_mode: aState.source_mode || "SIMULATED"
                 };
             }
         }
