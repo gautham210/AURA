@@ -257,7 +257,17 @@ setInterval(() => {
         data: { 
             junctions: junctionsState,
             green_wave: getGreenWaveStates(),
-            vision_replay: visionReplayStatus
+            vision_replay: visionReplayStatus,
+            demo_state: {
+                active: demoController.active,
+                elapsed: demoController.elapsedSeconds,
+                phase: demoController.active 
+                    ? (demoController.elapsedSeconds <= 8 ? 'WARM-UP' 
+                       : demoController.elapsedSeconds <= 30 ? 'PEAK SURGE' 
+                       : demoController.elapsedSeconds <= 50 ? 'MODERATION' 
+                       : 'RECOVERY')
+                    : 'IDLE'
+            }
         }
     };
 

@@ -60017,7 +60017,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_73",
@@ -61241,7 +61241,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_123",
@@ -61297,7 +61297,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_125",
@@ -61315,7 +61315,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_126",
@@ -61401,7 +61401,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_129",
@@ -62567,7 +62567,7 @@
         ]
       ],
       "approachAtTarget": "WESTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_178",
@@ -62593,7 +62593,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_179",
@@ -77563,7 +77563,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_812",
@@ -78931,7 +78931,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_870",
@@ -78957,7 +78957,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_871",
@@ -103767,7 +103767,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_1784",
@@ -103789,7 +103789,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_1785",
@@ -103867,7 +103867,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_1788",
@@ -103893,7 +103893,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_1789",
@@ -103911,7 +103911,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_1790",
@@ -103963,7 +103963,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_1792",
@@ -105555,7 +105555,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_1854",
@@ -112609,7 +112609,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2139",
@@ -113155,7 +113155,7 @@
         ]
       ],
       "approachAtTarget": "WESTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2162",
@@ -113177,7 +113177,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2163",
@@ -113333,7 +113333,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2171",
@@ -113373,7 +113373,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2173",
@@ -114903,7 +114903,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2236",
@@ -114933,7 +114933,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2237",
@@ -115411,7 +115411,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2258",
@@ -115471,7 +115471,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2260",
@@ -115627,7 +115627,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2268",
@@ -115679,7 +115679,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2270",
@@ -115697,7 +115697,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2271",
@@ -115757,7 +115757,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2273",
@@ -117171,7 +117171,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2330",
@@ -118981,7 +118981,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2407",
@@ -124529,7 +124529,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2629",
@@ -125385,7 +125385,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2669",
@@ -128657,7 +128657,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_2797",
@@ -174783,7 +174783,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_4684",
@@ -177297,7 +177297,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_4793",
@@ -177359,7 +177359,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_4796",
@@ -177403,7 +177403,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_4798",
@@ -193125,7 +193125,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_5521",
@@ -193151,7 +193151,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_5522",
@@ -258055,7 +258055,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_8296",
@@ -277033,7 +277033,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_8977",
@@ -277119,7 +277119,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_8980",
@@ -277377,7 +277377,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_8989",
@@ -277429,7 +277429,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_8991",
@@ -279577,7 +279577,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_9075",
@@ -279723,7 +279723,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_9082",
@@ -288561,7 +288561,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_9367",
@@ -394551,7 +394551,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_13352",
@@ -410121,7 +410121,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_13857",
@@ -412057,7 +412057,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_13937",
@@ -439113,7 +439113,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_14813",
@@ -440729,7 +440729,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_14871",
@@ -461193,7 +461193,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_15667",
@@ -534925,7 +534925,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_18131",
@@ -534969,7 +534969,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_18133",
@@ -542079,7 +542079,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_18400",
@@ -542273,7 +542273,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_18409",
@@ -542381,7 +542381,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_18415",
@@ -575105,7 +575105,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_19719",
@@ -575169,7 +575169,7 @@
         ]
       ],
       "approachAtTarget": "WESTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_19721",
@@ -579393,7 +579393,7 @@
         ]
       ],
       "approachAtTarget": "WESTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_19889",
@@ -583247,7 +583247,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_20034",
@@ -586143,7 +586143,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_20136",
@@ -586165,7 +586165,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_20137",
@@ -635237,7 +635237,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_22167",
@@ -635263,7 +635263,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_22168",
@@ -636217,7 +636217,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_22209",
@@ -636257,7 +636257,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_22211",
@@ -637473,7 +637473,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_22263",
@@ -639721,7 +639721,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_22361",
@@ -663811,7 +663811,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_23436",
@@ -667385,7 +667385,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_23589",
@@ -668195,7 +668195,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_23624",
@@ -668305,7 +668305,7 @@
         ]
       ],
       "approachAtTarget": "NORTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_23629",
@@ -676699,7 +676699,7 @@
         ]
       ],
       "approachAtTarget": "WESTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_23994",
@@ -693005,7 +693005,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_24665",
@@ -733131,7 +733131,7 @@
         ]
       ],
       "approachAtTarget": "EASTBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_26420",
@@ -736853,7 +736853,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_26561",
@@ -736889,7 +736889,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_26563",
@@ -736923,7 +736923,7 @@
         ]
       ],
       "approachAtTarget": "SOUTHBOUND",
-      "is_aura_corridor": false
+      "is_aura_corridor": true
     },
     {
       "id": "edge_26564",
@@ -739014,9 +739014,9 @@
     {
       "id": "J3",
       "name": "Kaloor Junction",
-      "osmNodeId": "4335369067",
-      "lat": 9.987439,
-      "lng": 76.2945554,
+      "osmNodeId": "8375973405",
+      "lat": 9.9950745,
+      "lng": 76.2922585,
       "distanceToNext": 2000,
       "approaches": {
         "NORTHBOUND": true

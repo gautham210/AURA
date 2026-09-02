@@ -49,6 +49,33 @@ class AuraStateStore {
         if (this.currentMode === 'CONTROL_ROOM' && this.selectedJunctionId) {
             renderJunctionDetail(this.selectedJunctionId);
         }
+        
+        // Update Demo Running Status Indicator
+        const demoState = stateData.demo_state;
+        const demoIndicator = document.getElementById('demo-status-indicator');
+        const demoElapsed = document.getElementById('demo-elapsed');
+        const demoPhaseLabel = document.getElementById('demo-phase-label');
+        if (demoIndicator && demoState) {
+            if (demoState.active) {
+                demoIndicator.classList.remove('hidden');
+                demoIndicator.classList.add('flex');
+                if (demoElapsed) demoElapsed.textContent = `T+${demoState.elapsed}s`;
+                if (demoPhaseLabel) {
+                    demoPhaseLabel.textContent = demoState.phase;
+                    // Color-code phase
+                    const phaseColors = {
+                        'WARM-UP': '#10B981',
+                        'PEAK SURGE': '#EF4444',
+                        'MODERATION': '#F59E0B',
+                        'RECOVERY': '#3B82F6'
+                    };
+                    demoPhaseLabel.style.color = phaseColors[demoState.phase] || '#F59E0B';
+                }
+            } else {
+                demoIndicator.classList.add('hidden');
+                demoIndicator.classList.remove('flex');
+            }
+        }
     }
 }
 
@@ -93,6 +120,7 @@ if (btnCloseDrawer) {
 
 function switchMode(mode) {
     store.currentMode = mode;
+    const adminControls = document.getElementById('admin-controls');
     
     if (mode === 'CONTROL_ROOM') {
         if (tabControlRoom) tabControlRoom.className = "text-xs font-bold px-3 py-1.5 rounded-md border border-[#3B82F6] bg-[#1E3A8A]/30 text-[#60A5FA] transition-all flex items-center gap-1.5 shadow-sm";
@@ -102,6 +130,9 @@ function switchMode(mode) {
         if (crInsightsPanel) crInsightsPanel.classList.remove('hidden');
         const topMetrics = document.getElementById('top-metrics');
         if (topMetrics) topMetrics.classList.remove('hidden');
+        
+        // Restore admin controls
+        if (adminControls) adminControls.classList.remove('hidden');
         
         // Show Control Room Layers
         if (corridorLayer && map && !map.hasLayer(corridorLayer)) map.addLayer(corridorLayer);
@@ -125,6 +156,9 @@ function switchMode(mode) {
         const topMetrics = document.getElementById('top-metrics');
         if (topMetrics) topMetrics.classList.add('hidden');
         
+        // Hide admin controls in User View
+        if (adminControls) adminControls.classList.add('hidden');
+        
         if (drawerControl) drawerControl.classList.add('translate-x-full');
         highlightMarker(null);
         
@@ -147,7 +181,7 @@ function initMap(graphData) {
     map = L.map('map', { zoomControl: false }).setView([9.995, 76.305], 12);
     L.control.zoom({ position: 'topright' }).addTo(map);
     
-    // Keyless OpenStreetMap standard tiles with high-contrast cybernetic filter
+    // OpenStreetMap standard tiles with CSS dark inversion filter (keyless, free)
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         className: 'osm-dark-tiles',
@@ -179,10 +213,19 @@ function initMap(graphData) {
     if (graphData && graphData.edges) {
         graphData.edges.forEach(edge => {
             if (edge.is_aura_corridor && edge.geometry && edge.geometry.length > 0) {
+                // Glow underlay for visual dominance
+                L.polyline(edge.geometry, {
+                    color: '#1E40AF',
+                    weight: 8,
+                    opacity: 0.35,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                }).addTo(corridorLayer);
+                // Main corridor line
                 L.polyline(edge.geometry, {
                     color: '#3B82F6',
-                    weight: 3.5,
-                    opacity: 0.75,
+                    weight: 4,
+                    opacity: 0.9,
                     lineCap: 'round',
                     lineJoin: 'round'
                 }).addTo(corridorLayer);

@@ -96,15 +96,26 @@ class DemoTrafficController {
         const t = this.elapsedSeconds;
         if (!this.active) return arrivalsMap;
 
-        // Structured congestion surge
-        // T=0..10: Normal equilibrium (low demand)
-        // T=11..35: Surge on arterial junctions J2, J3, J4
-        // T=36..60: Moderating demand during emergency passage
-        // T>60: Recovery to normal flow
+        // Structured congestion surge (accelerated for demo visibility)
+        // T=0..8:  Warm-up: moderate demand across all approaches
+        // T=9..30: Peak: heavy surge on arterial J2, J3, J4 bottleneck
+        // T=31..50: Moderating demand during emergency passage
+        // T>50: Recovery to normal flow
         let baseDemand = 0;
-        if (t >= 0 && t <= 10) baseDemand = 1;
-        else if (t > 10 && t <= 45) baseDemand = 2;
-        else baseDemand = 1;
+        let arrivalProbability = 0.5;
+        if (t >= 0 && t <= 8) {
+            baseDemand = 2;
+            arrivalProbability = 0.6;
+        } else if (t > 8 && t <= 30) {
+            baseDemand = 4;
+            arrivalProbability = 0.75;
+        } else if (t > 30 && t <= 50) {
+            baseDemand = 2;
+            arrivalProbability = 0.5;
+        } else {
+            baseDemand = 1;
+            arrivalProbability = 0.4;
+        }
 
         this.graph.controlledJunctions.forEach(j => {
             const junctionState = this.trafficEngine.state[j.id];
@@ -114,12 +125,12 @@ class DemoTrafficController {
             for (const phase of junctionState.phases) {
                 for (const app of phase) {
                     let count = 0;
-                    if (Math.random() < 0.25) {
+                    if (Math.random() < arrivalProbability) {
                         count = Math.floor(Math.random() * baseDemand) + 1;
                     }
-                    // Deliberate bottleneck surge on Palarivattom/Kaloor during surge phase
-                    if (t > 10 && t <= 35 && (j.id === 'J2' || j.id === 'J3') && (app === 'NORTHBOUND' || app === 'SOUTHBOUND')) {
-                        count = 2;
+                    // Deliberate bottleneck surge on Palarivattom/Kaloor during peak phase
+                    if (t > 8 && t <= 30 && (j.id === 'J2' || j.id === 'J3') && (app === 'NORTHBOUND' || app === 'SOUTHBOUND')) {
+                        count = Math.floor(Math.random() * 3) + 3; // 3-5 vehicles per tick
                     }
                     
                     arrivalsMap[j.id][app] = { counts: { car: count } };

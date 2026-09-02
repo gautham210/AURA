@@ -40,10 +40,10 @@
             padding: 0 !important;
         }
 
-        /* High-contrast dark OpenStreetMap tile filter - 100% Keyless, zero watermarks */
+        /* High-contrast dark OpenStreetMap tile filter — Keyless, zero watermarks */
         .leaflet-container { background: #07090e !important; }
         .osm-dark-tiles .leaflet-tile {
-            filter: brightness(0.62) invert(1) contrast(2.6) hue-rotate(200deg) saturate(0.25) brightness(0.8);
+            filter: brightness(0.55) invert(1) contrast(2.8) hue-rotate(200deg) saturate(0.2) brightness(0.75);
         }
         
         /* Tooltips */
@@ -126,7 +126,7 @@
             </div>
         </div>
 
-        <div class="flex gap-3 items-center">
+        <div class="flex gap-3 items-center" id="admin-controls">
             <!-- Demo Controls -->
             <div class="flex items-center gap-1.5 bg-[#161b22] px-2 py-1 rounded-md border border-[#30363d]">
                 <button id="btn-demo-start" class="px-2.5 py-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-mono text-[10px] font-bold rounded shadow transition-colors flex items-center gap-1">
@@ -203,6 +203,15 @@
             <div class="flex items-center gap-2">
                 <span class="text-[10px] font-mono text-[#8b949e]">EMERGENCY NETWORK:</span>
                 <span id="poi-summary-badge" class="text-[10px] font-mono text-white bg-[#161b22] px-2 py-0.5 rounded border border-[#30363d]">🏥 10 Major Hospitals</span>
+            </div>
+            <div class="w-px h-4 bg-[#30363d]"></div>
+            <!-- Demo Running Status Indicator -->
+            <div id="demo-status-indicator" class="hidden items-center gap-2 px-3 py-1 bg-[#10B981]/10 border border-[#10B981]/40 rounded-md animate-pulse">
+                <span class="w-2 h-2 rounded-full bg-[#10B981]"></span>
+                <span class="text-[10px] font-mono font-bold text-[#10B981] tracking-wider">DEMO RUNNING</span>
+                <span id="demo-elapsed" class="text-[10px] font-mono font-bold text-white">T+0s</span>
+                <span class="text-[#30363d]">|</span>
+                <span id="demo-phase-label" class="text-[10px] font-mono font-bold text-[#F59E0B]">WARM-UP</span>
             </div>
         </div>
 
