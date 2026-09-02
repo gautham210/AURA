@@ -7,9 +7,10 @@ class AuraStateStore {
         this.greenWave = {};
         this.selectedJunctionId = null;
         this.currentMode = 'CONTROL_ROOM'; // 'CONTROL_ROOM' or 'USER_VIEW'
-        this.activePolylines = []; // For routing
         this.userOriginLat = null;
         this.userOriginLng = null;
+        this.userDestLat = null;
+        this.userDestLng = null;
     }
 
     updateGraph(graphData) {
@@ -20,10 +21,11 @@ class AuraStateStore {
 
     updateTrafficState(stateData) {
         this.networkState = stateData.junctions;
-        this.greenWave = stateData.green_wave;
+        this.greenWave = stateData.green_wave || {};
         
         updateTopMetrics(this.networkState);
         updateMapMarkers(this.networkState);
+        updateTrafficBlips(this.networkState);
         updateGreenWavePanel(this.greenWave);
         updateDataSourceLabel(this.networkState);
         
@@ -34,8 +36,13 @@ class AuraStateStore {
 }
 
 const store = new AuraStateStore();
-let map, edgeLayer, markerLayer, routingLayer;
-const markers = {};
+let map, corridorLayer, poiLayer, markerLayer, trafficBlipLayer, routingLayer;
+const junctionMarkers = {};
+const trafficBlips = {};
+let isMapOriginSelectionMode = false;
+let isMapDestSelectionMode = false;
+let userOriginMarker = null;
+let userDestMarker = null;
 
 // DOM Elements
 const tabControlRoom = document.getElementById('tab-control-room');
@@ -47,103 +54,219 @@ const dataSourceLabel = document.getElementById('data-source');
 const connectionStatus = document.getElementById('connection-status');
 const crInsightsPanel = document.getElementById('cr-insights-panel');
 
-// Initialization
+// Setup Tabs
+tabControlRoom.addEventListener('click', () => switchMode('CONTROL_ROOM'));
+tabUserView.addEventListener('click', () => switchMode('USER_VIEW'));
+btnCloseDrawer.addEventListener('click', () => {
+    drawerControl.classList.add('translate-x-full');
+    store.selectedJunctionId = null;
+    highlightMarker(null);
+});
+
+function switchMode(mode) {
+    store.currentMode = mode;
+    
+    if (mode === 'CONTROL_ROOM') {
+        tabControlRoom.className = "text-xs font-bold px-3 py-1.5 rounded-md border border-[#3B82F6] bg-[#1E3A8A]/30 text-[#60A5FA] transition-all flex items-center gap-1.5 shadow-sm";
+        tabUserView.className = "text-xs font-semibold px-3 py-1.5 rounded-md border border-transparent text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-all flex items-center gap-1.5";
+        
+        panelUserView.classList.add('hidden');
+        crInsightsPanel.classList.remove('hidden');
+        document.getElementById('top-metrics').classList.remove('hidden');
+        
+        if (poiLayer) poiLayer.addTo(map);
+        if (trafficBlipLayer) trafficBlipLayer.addTo(map);
+        if (routingLayer) routingLayer.clearLayers();
+        if (userOriginMarker) map.removeLayer(userOriginMarker);
+        if (userDestMarker) map.removeLayer(userDestMarker);
+        
+        if (store.selectedJunctionId) {
+            drawerControl.classList.remove('translate-x-full');
+        }
+    } else {
+        tabControlRoom.className = "text-xs font-semibold px-3 py-1.5 rounded-md border border-transparent text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-all flex items-center gap-1.5";
+        tabUserView.className = "text-xs font-bold px-3 py-1.5 rounded-md border border-[#3B82F6] bg-[#1E3A8A]/30 text-[#60A5FA] transition-all flex items-center gap-1.5 shadow-sm";
+        
+        panelUserView.classList.remove('hidden');
+        crInsightsPanel.classList.add('hidden');
+        document.getElementById('top-metrics').classList.add('hidden');
+        drawerControl.classList.add('translate-x-full');
+        highlightMarker(null);
+        
+        if (poiLayer && map.hasLayer(poiLayer)) map.removeLayer(poiLayer);
+        if (trafficBlipLayer && map.hasLayer(trafficBlipLayer)) map.removeLayer(trafficBlipLayer);
+    }
+    
+    setTimeout(() => map && map.invalidateSize(), 100);
+}
+
+// -------------------------------------------------------------
+// Map Initialization (OpenStreetMap Standard Keyless Layer)
+// -------------------------------------------------------------
 function initMap(graphData) {
     if (map) return;
-    map = L.map('map', { zoomControl: false }).setView([9.98, 76.31], 12);
     
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    map = L.map('map', { zoomControl: false }).setView([9.995, 76.305], 12);
+    
+    // Zoom control in top-right
+    L.control.zoom({ position: 'topright' }).addTo(map);
+    
+    // 100% Keyless OpenStreetMap Standard Tiles with dark cybernetic filter
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        className: 'osm-dark-tiles',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    edgeLayer = L.layerGroup().addTo(map);
-    routingLayer = L.layerGroup().addTo(map);
+    corridorLayer = L.layerGroup().addTo(map);
+    poiLayer = L.layerGroup().addTo(map);
+    trafficBlipLayer = L.layerGroup().addTo(map);
     markerLayer = L.layerGroup().addTo(map);
+    routingLayer = L.layerGroup().addTo(map);
 
+    // Map Click Handler for User View
     map.on('click', (e) => {
-        if (store.currentMode === 'USER_VIEW' && isMapSelectionMode) {
-            setOriginLocation(e.latlng.lat, e.latlng.lng);
-            isMapSelectionMode = false;
-            document.getElementById('map').style.cursor = '';
-            document.getElementById('origin-display').className = "text-xs font-mono text-[#10B981] px-3 py-2 bg-[#10B981]/10 rounded border border-[#10B981]/30";
+        if (store.currentMode === 'USER_VIEW') {
+            if (isMapOriginSelectionMode) {
+                setOriginLocation(e.latlng.lat, e.latlng.lng);
+                isMapOriginSelectionMode = false;
+                document.getElementById('map').style.cursor = '';
+            } else if (isMapDestSelectionMode) {
+                setDestinationLocation(e.latlng.lat, e.latlng.lng);
+                isMapDestSelectionMode = false;
+                document.getElementById('map').style.cursor = '';
+            }
         }
     });
-    
-    // Draw AURA Corridors
+
+    // 1. Draw AURA Corridors (Real OSM Geometry)
     graphData.edges.forEach(edge => {
-        if (edge.is_aura_corridor) {
+        if (edge.is_aura_corridor && edge.geometry && edge.geometry.length > 0) {
             L.polyline(edge.geometry, {
-                color: '#424754',
-                weight: 3,
-                opacity: 0.6
-            }).addTo(edgeLayer);
+                color: '#3B82F6',
+                weight: 3.5,
+                opacity: 0.75,
+                lineCap: 'round',
+                lineJoin: 'round'
+            }).addTo(corridorLayer);
         }
     });
 
-    // We don't draw raw OSM edges to avoid cluttering the UI. 
-    // The base OSM map provides the visual roads.
+    // 2. Draw Emergency POIs (Hospitals, Fire, Police)
+    drawPOIs(graphData.pois);
 
-    // Draw POIs
-    graphData.pois.forEach(p => {
-        let iconType = "POI";
-        let bgColor = "bg-[#3B82F6]";
-        let borderColor = "border-[#1E3A8A]";
+    // 3. Draw Six Controlled Junctions
+    drawControlledJunctions(graphData.controlledJunctions);
+}
+
+// -------------------------------------------------------------
+// Draw Emergency POIs
+// -------------------------------------------------------------
+function drawPOIs(pois) {
+    if (!pois) return;
+    
+    // Priority / Major facility filter
+    const majorHospitals = [
+        "Amrita", "Aster", "Lakeshore", "Medical Trust", "Renai", "Ernakulam Medical",
+        "General Hospital", "PVS", "Lisie", "Lourdes", "Rajagiri", "Sunrise"
+    ];
+
+    pois.forEach(p => {
+        let isMajor = false;
+        let iconSymbol = "🏥";
+        let iconBg = "bg-[#EF4444]/20 border-[#EF4444]";
+        let textColor = "text-[#EF4444]";
         
         if (p.type === 'hospital' || p.type === 'clinic') {
-            iconType = "🏥"; bgColor = "bg-[#EF4444]/20"; borderColor = "border-[#EF4444]";
+            iconSymbol = "🏥";
+            iconBg = "bg-[#EF4444]/20 border-[#EF4444]";
+            textColor = "text-[#F87171]";
+            isMajor = majorHospitals.some(mh => p.name.toLowerCase().includes(mh.toLowerCase()));
         } else if (p.type === 'fire_station') {
-            iconType = "🚒"; bgColor = "bg-[#F59E0B]/20"; borderColor = "border-[#F59E0B]";
+            iconSymbol = "🚒";
+            iconBg = "bg-[#F59E0B]/20 border-[#F59E0B]";
+            textColor = "text-[#FBBF24]";
+            isMajor = true;
         } else if (p.type === 'police') {
-            iconType = "👮"; bgColor = "bg-[#3B82F6]/20"; borderColor = "border-[#3B82F6]";
+            iconSymbol = "👮";
+            iconBg = "bg-[#3B82F6]/20 border-[#3B82F6]";
+            textColor = "text-[#60A5FA]";
+            isMajor = true;
         }
-        
-        const iconHtml = `
-            <div class="relative flex items-center justify-center w-5 h-5 rounded-full ${bgColor} border ${borderColor} shadow-sm">
-                <span class="text-[10px]">${iconType}</span>
-            </div>
-        `;
-        const icon = L.divIcon({ className: 'custom-div-icon', html: iconHtml, iconSize: [20, 20], iconAnchor: [10, 10] });
-        const marker = L.marker([p.lat, p.lng], { icon });
-        marker.bindTooltip(`<b>${p.name}</b><br/>${p.type.replace('_', ' ')}`, { permanent: false, direction: 'top', className: 'junction-tooltip' });
-        
-        // Hide POIs on low zoom
-        map.on('zoomend', function() {
-            if (map.getZoom() < 14) {
-                if (map.hasLayer(marker)) map.removeLayer(marker);
-            } else {
-                if (!map.hasLayer(marker)) marker.addTo(markerLayer);
-            }
-        });
-    });
 
-    // Draw Controlled Junctions
-    const boundsArr = [];
-    graphData.controlledJunctions.forEach(j => {
-        boundsArr.push([j.lat, j.lng]);
-        
         const iconHtml = `
-            <div class="relative flex items-center justify-center w-6 h-6 rounded-full bg-[#161B22] border border-[#424754] shadow-md transition-colors cursor-pointer" id="marker-${j.id}">
-                <span class="text-[9px] font-mono text-[#8c909f] font-bold" id="marker-text-${j.id}">${j.id}</span>
-                <!-- Inner indicator -->
-                <div class="absolute inset-[2px] rounded-full opacity-0 pointer-events-none border-2 border-transparent transition-all" id="marker-glow-${j.id}"></div>
+            <div class="relative flex items-center justify-center w-5 h-5 rounded-full ${iconBg} border shadow-md transition-transform hover:scale-125">
+                <span class="text-[10px] leading-none">${iconSymbol}</span>
             </div>
         `;
         
         const icon = L.divIcon({
-            className: 'custom-div-icon',
+            className: 'poi-custom-icon',
             html: iconHtml,
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+
+        const marker = L.marker([p.lat, p.lng], { icon });
+        marker.bindTooltip(`<b>${p.name}</b><br/><span class="${textColor} font-mono text-[9px] uppercase">${p.type.replace('_', ' ')}</span>`, {
+            permanent: false,
+            direction: 'top',
+            className: 'aura-tooltip'
+        });
+
+        // Add to layer if major or when zoomed in
+        if (isMajor) {
+            marker.addTo(poiLayer);
+        }
+
+        map.on('zoomend', () => {
+            const z = map.getZoom();
+            if (z < 13) {
+                if (!isMajor && poiLayer.hasLayer(marker)) poiLayer.removeLayer(marker);
+            } else {
+                if (!poiLayer.hasLayer(marker)) marker.addTo(poiLayer);
+            }
+        });
+    });
+}
+
+// -------------------------------------------------------------
+// Draw Controlled Junctions (J1 to J6)
+// -------------------------------------------------------------
+function drawControlledJunctions(junctions) {
+    const bounds = [];
+
+    junctions.forEach(j => {
+        bounds.push([j.lat, j.lng]);
+
+        const iconHtml = `
+            <div class="relative flex items-center justify-center cursor-pointer group" id="marker-${j.id}">
+                <!-- Outer status halo -->
+                <div id="marker-halo-${j.id}" class="absolute -inset-1.5 rounded-full border-2 border-[#10B981] opacity-70 transition-all duration-300"></div>
+                
+                <!-- Main Badge Core -->
+                <div class="relative w-8 h-8 rounded-full bg-[#0d1117] border border-[#30363d] flex items-center justify-center shadow-2xl z-10">
+                    <span class="text-[11px] font-mono font-bold text-white tracking-tight" id="marker-text-${j.id}">${j.id}</span>
+                    <!-- Signal Pip Indicator -->
+                    <span id="marker-pip-${j.id}" class="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#10B981] border-2 border-[#0d1117]"></span>
+                </div>
+            </div>
+        `;
+
+        const icon = L.divIcon({
+            className: 'junction-custom-icon',
+            html: iconHtml,
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
         });
 
         const marker = L.marker([j.lat, j.lng], { icon }).addTo(markerLayer);
-        
+
         marker.bindTooltip(`<b>${j.id}</b> ${j.name}`, {
             permanent: true,
             direction: 'right',
-            className: 'junction-tooltip',
-            offset: [15, 0]
+            className: 'aura-tooltip',
+            offset: [16, 0]
         });
 
         marker.on('click', () => {
@@ -152,89 +275,151 @@ function initMap(graphData) {
             }
         });
 
-        markers[j.id] = { marker, elementId: `marker-${j.id}`, glowId: `marker-glow-${j.id}` };
+        junctionMarkers[j.id] = {
+            marker,
+            haloId: `marker-halo-${j.id}`,
+            pipId: `marker-pip-${j.id}`,
+            lat: j.lat,
+            lng: j.lng
+        };
     });
 
-    if (boundsArr.length > 0) {
-        map.fitBounds(boundsArr, { padding: [60, 60] });
+    if (bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [60, 60] });
     }
 }
 
-// UI Interactions
-tabControlRoom.addEventListener('click', () => switchMode('CONTROL_ROOM'));
-tabUserView.addEventListener('click', () => switchMode('USER_VIEW'));
+// -------------------------------------------------------------
+// Real Traffic Blip Visualization
+// -------------------------------------------------------------
+function updateTrafficBlips(networkState) {
+    if (!networkState || !trafficBlipLayer) return;
 
-btnCloseDrawer.addEventListener('click', () => {
-    store.selectedJunctionId = null;
-    drawerControl.classList.add('translate-x-full');
-    highlightMarker(null);
-});
+    // Approach Direction coordinate offsets (approximate meters in lat/lng)
+    const offsets = {
+        "NORTHBOUND": [ 0.0022, 0.0000 ],
+        "SOUTHBOUND": [ -0.0022, 0.0000 ],
+        "EASTBOUND":  [ 0.0000, 0.0028 ],
+        "WESTBOUND":  [ 0.0000, -0.0028 ]
+    };
 
-function switchMode(mode) {
-    store.currentMode = mode;
-    
-    if (mode === 'CONTROL_ROOM') {
-        tabControlRoom.className = "text-sm font-semibold border-b-2 border-[#3B82F6] pb-1.5 text-[#3B82F6] transition-colors";
-        tabUserView.className = "text-sm font-semibold border-b-2 border-transparent pb-1.5 text-[#8c909f] hover:text-[#e1e2ec] transition-colors";
-        
-        panelUserView.classList.add('hidden');
-        crInsightsPanel.classList.remove('hidden');
-        document.getElementById('top-metrics').classList.remove('hidden');
-        
-        if (store.selectedJunctionId) {
-            drawerControl.classList.remove('translate-x-full');
-        }
-        
-        routingLayer.clearLayers();
-    } else {
-        tabControlRoom.className = "text-sm font-semibold border-b-2 border-transparent pb-1.5 text-[#8c909f] hover:text-[#e1e2ec] transition-colors";
-        tabUserView.className = "text-sm font-semibold border-b-2 border-[#3B82F6] pb-1.5 text-[#3B82F6] transition-colors";
-        
-        panelUserView.classList.remove('hidden');
-        crInsightsPanel.classList.add('hidden');
-        document.getElementById('top-metrics').classList.add('hidden');
-        drawerControl.classList.add('translate-x-full');
-        highlightMarker(null);
-    }
-    
-    setTimeout(() => map.invalidateSize(), 100);
-}
+    networkState.forEach(j => {
+        const jm = junctionMarkers[j.junction_id];
+        if (!jm) return;
 
-function selectJunction(id) {
-    store.selectedJunctionId = id;
-    highlightMarker(id);
-    renderJunctionDetail(id);
-    drawerControl.classList.remove('translate-x-full');
-    
-    const jData = store.graph.controlledJunctions.find(j => j.id === id);
-    if (jData) {
-        map.panTo([jData.lat, jData.lng]);
-    }
-}
+        Object.entries(j.aura.approaches).forEach(([dir, appState]) => {
+            const blipKey = `${j.junction_id}_${dir}`;
+            const offset = offsets[dir] || [0.001, 0.001];
+            const blipLat = jm.lat + offset[0];
+            const blipLng = jm.lng + offset[1];
 
-function highlightMarker(selectedId) {
-    Object.keys(markers).forEach(id => {
-        const el = document.getElementById(markers[id].elementId);
-        const textEl = document.getElementById(`marker-text-${id}`);
-        if (el) {
-            if (id === selectedId) {
-                el.classList.add('border-[#3B82F6]', 'bg-[#1E3A8A]/50');
-                el.classList.remove('border-[#424754]', 'bg-[#161B22]');
-                el.style.boxShadow = '0 0 10px rgba(59, 130, 246, 0.4)';
-                if(textEl) { textEl.classList.add('text-white'); textEl.classList.remove('text-[#8c909f]'); }
+            const q = appState.queue_pcu || 0;
+            const mode = appState.source_mode || "SIMULATED";
+
+            if (q > 1.0) {
+                let colorClass = "bg-[#10B981]";
+                let borderColor = "border-[#10B981]";
+                let sizePx = 10;
+
+                if (q > 25) {
+                    colorClass = "bg-[#EF4444]";
+                    borderColor = "border-[#EF4444]";
+                    sizePx = 16;
+                } else if (q > 10) {
+                    colorClass = "bg-[#F59E0B]";
+                    borderColor = "border-[#F59E0B]";
+                    sizePx = 13;
+                }
+
+                const blipHtml = `
+                    <div class="relative flex items-center justify-center queue-blip" style="width:${sizePx}px; height:${sizePx}px">
+                        <div class="absolute inset-0 rounded-full ${colorClass} opacity-40 animate-ping"></div>
+                        <div class="w-full h-full rounded-full ${colorClass} border ${borderColor} shadow-lg flex items-center justify-center">
+                            <span class="text-[7px] font-mono text-white font-bold">${Math.round(q)}</span>
+                        </div>
+                    </div>
+                `;
+
+                if (!trafficBlips[blipKey]) {
+                    const blipIcon = L.divIcon({
+                        className: 'blip-custom-icon',
+                        html: blipHtml,
+                        iconSize: [sizePx, sizePx],
+                        iconAnchor: [sizePx/2, sizePx/2]
+                    });
+                    const marker = L.marker([blipLat, blipLng], { icon: blipIcon }).addTo(trafficBlipLayer);
+                    marker.bindTooltip(`<b>${j.junction_id} ${dir}</b><br/>Queue: ${q.toFixed(1)} PCU (${mode})`, {
+                        direction: 'top',
+                        className: 'aura-tooltip'
+                    });
+                    trafficBlips[blipKey] = marker;
+                } else {
+                    const blipIcon = L.divIcon({
+                        className: 'blip-custom-icon',
+                        html: blipHtml,
+                        iconSize: [sizePx, sizePx],
+                        iconAnchor: [sizePx/2, sizePx/2]
+                    });
+                    trafficBlips[blipKey].setIcon(blipIcon);
+                    trafficBlips[blipKey].setTooltipContent(`<b>${j.junction_id} ${dir}</b><br/>Queue: ${q.toFixed(1)} PCU (${mode})`);
+                }
             } else {
-                el.classList.remove('border-[#3B82F6]', 'bg-[#1E3A8A]/50');
-                el.classList.add('border-[#424754]', 'bg-[#161B22]');
-                el.style.boxShadow = 'none';
-                if(textEl) { textEl.classList.remove('text-white'); textEl.classList.add('text-[#8c909f]'); }
+                if (trafficBlips[blipKey]) {
+                    trafficBlipLayer.removeLayer(trafficBlips[blipKey]);
+                    delete trafficBlips[blipKey];
+                }
+            }
+        });
+    });
+}
+
+// -------------------------------------------------------------
+// Real-time Marker & Signal Updates
+// -------------------------------------------------------------
+function updateMapMarkers(networkState) {
+    networkState.forEach(j => {
+        const jm = junctionMarkers[j.junction_id];
+        if (!jm) return;
+
+        const haloEl = document.getElementById(jm.haloId);
+        const pipEl = document.getElementById(jm.pipId);
+
+        // Calculate max demand across approaches
+        let maxQ = 0;
+        let isGreen = false;
+
+        Object.values(j.aura.approaches).forEach(app => {
+            if (app.queue_pcu > maxQ) maxQ = app.queue_pcu;
+            if (app.signal_state === "GREEN") isGreen = true;
+        });
+
+        // Update Halo (Congestion state)
+        if (haloEl) {
+            if (maxQ > 25) {
+                haloEl.className = "absolute -inset-1.5 rounded-full border-2 border-[#EF4444] shadow-[0_0_12px_rgba(239,68,68,0.8)] opacity-90 animate-pulse";
+            } else if (maxQ > 10) {
+                haloEl.className = "absolute -inset-1.5 rounded-full border-2 border-[#F59E0B] shadow-[0_0_8px_rgba(245,158,11,0.5)] opacity-80";
+            } else {
+                haloEl.className = "absolute -inset-1.5 rounded-full border-2 border-[#10B981] opacity-70";
+            }
+        }
+
+        // Update Pip (Signal state)
+        if (pipEl) {
+            if (isGreen) {
+                pipEl.className = "absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#10B981] border-2 border-[#0d1117] shadow-[0_0_6px_#10B981]";
+            } else {
+                pipEl.className = "absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#EF4444] border-2 border-[#0d1117]";
             }
         }
     });
 }
 
-// Data Rendering
+// -------------------------------------------------------------
+// Top Metrics Strip Updates
+// -------------------------------------------------------------
 function updateTopMetrics(networkState) {
-    if (networkState.length === 0) return;
+    if (!networkState || networkState.length === 0) return;
     
     let totalDelay = 0;
     let delayCount = 0;
@@ -258,29 +443,36 @@ function updateTopMetrics(networkState) {
     const avgDelay = delayCount > 0 ? (totalDelay / delayCount).toFixed(1) : "0.0";
     
     document.getElementById('metric-delay').textContent = `${avgDelay}s`;
-    document.getElementById('metric-demand').textContent = maxDemand.toFixed(1);
+    document.getElementById('metric-demand').textContent = `${maxDemand.toFixed(1)} PCU`;
     document.getElementById('metric-spillbacks').textContent = totalSpillbacks;
 }
 
-function updateMapMarkers(networkState) {
-    networkState.forEach(j => {
-        const m = markers[j.junction_id];
-        if (!m) return;
-        
-        const glowEl = document.getElementById(m.glowId);
-        if (glowEl) {
-            // Find max queue to set congestion color
-            let maxQ = 0;
-            Object.values(j.aura.approaches).forEach(app => {
-                if (app.queue_pcu > maxQ) maxQ = app.queue_pcu;
-            });
-            
-            if (maxQ > 30) {
-                glowEl.className = 'absolute inset-[2px] rounded-full pointer-events-none border-2 border-[#EF4444] shadow-[inset_0_0_8px_rgba(239,68,68,0.5)] opacity-100 animate-pulse';
-            } else if (maxQ > 15) {
-                glowEl.className = 'absolute inset-[2px] rounded-full pointer-events-none border-2 border-[#F59E0B] shadow-[inset_0_0_8px_rgba(245,158,11,0.3)] opacity-100';
+// -------------------------------------------------------------
+// Junction Selection & Detail Drawer
+// -------------------------------------------------------------
+function selectJunction(id) {
+    store.selectedJunctionId = id;
+    highlightMarker(id);
+    renderJunctionDetail(id);
+    drawerControl.classList.remove('translate-x-full');
+    
+    const jData = store.graph.controlledJunctions.find(j => j.id === id);
+    if (jData) {
+        map.panTo([jData.lat, jData.lng]);
+    }
+}
+
+function highlightMarker(selectedId) {
+    Object.keys(junctionMarkers).forEach(id => {
+        const markerObj = junctionMarkers[id];
+        const haloEl = document.getElementById(markerObj.haloId);
+        if (haloEl) {
+            if (id === selectedId) {
+                haloEl.classList.add('border-[#3B82F6]', 'scale-125');
+                haloEl.style.boxShadow = '0 0 16px rgba(59, 130, 246, 0.9)';
             } else {
-                glowEl.className = 'absolute inset-[2px] rounded-full opacity-0 pointer-events-none border-2 border-transparent';
+                haloEl.classList.remove('border-[#3B82F6]', 'scale-125');
+                haloEl.style.boxShadow = '';
             }
         }
     });
@@ -291,53 +483,62 @@ function renderJunctionDetail(id) {
     const jState = store.networkState.find(s => s.junction_id === id);
     if (!jNode || !jState) return;
 
-    // Header
+    // Header Info
     document.getElementById('drawer-jid').textContent = id;
     document.getElementById('drawer-title').textContent = jNode.name;
-    document.getElementById('drawer-phase').textContent = jState.current_phase || jState.aura.current_phase;
+    document.getElementById('drawer-phase').textContent = `PHASE ${jState.current_phase || jState.aura.current_phase}`;
     
-    // Semantics from Backend
+    // Authoritative Phase Description from Backend
     const activeMovements = jState.aura.current_phase_description || "--";
     document.getElementById('drawer-phase-desc').textContent = `ACTIVE MOVEMENTS: ${activeMovements}`;
 
-    // 4-Way Visual
+    // 4-Way Signal Light Visuals
     document.getElementById('center-sig-id').textContent = id;
     const dirs = ["NORTHBOUND", "SOUTHBOUND", "EASTBOUND", "WESTBOUND"];
+    
     dirs.forEach(dir => {
         const el = document.getElementById(`sig-${dir}`);
         if (el) {
             const appState = jState.aura.approaches[dir];
             if (appState) {
                 if (appState.signal_state === "GREEN") {
-                    el.className = "w-5 h-5 rounded-full border border-[#424754] signal-green";
+                    el.className = "w-5 h-5 rounded-full border border-[#30363d] signal-green";
                 } else {
-                    el.className = "w-5 h-5 rounded-full border border-[#424754] signal-red";
+                    el.className = "w-5 h-5 rounded-full border border-[#30363d] signal-red";
                 }
             } else {
-                // Direction doesn't exist at this junction
-                el.className = "w-5 h-5 rounded-full bg-[#161B22] border border-[#30363D]";
+                el.className = "w-5 h-5 rounded-full bg-[#21262d] border border-[#30363d]";
             }
         }
     });
 
-    // Approaches Data
+    // Approach Telemetry Table
     const approachesContainer = document.getElementById('drawer-approaches');
     approachesContainer.innerHTML = '';
     
     dirs.forEach(dir => {
         const appState = jState.aura.approaches[dir];
         if (appState) {
-            const color = appState.signal_state === "GREEN" ? "text-[#10B981]" : "text-[#EF4444]";
+            const isGreen = appState.signal_state === "GREEN";
+            const sigBadge = isGreen ? "bg-[#10B981]/20 text-[#10B981] border-[#10B981]/40" : "bg-[#EF4444]/20 text-[#EF4444] border-[#EF4444]/40";
+            const modeBadge = appState.source_mode === "LIVE" ? "text-[#10B981]" : (appState.source_mode === "REPLAY" ? "text-[#F59E0B]" : "text-[#8b949e]");
+
             const html = `
-                <div class="bg-[#10131a] border border-[#30363D] rounded p-2 flex justify-between items-center">
-                    <div class="flex items-center gap-2">
-                        <span class="text-[10px] font-bold text-[#8c909f] w-14">${dir.substring(0,5)}</span>
-                        <span class="text-[10px] font-bold ${color}">${appState.signal_state}</span>
-                        <span class="text-[8px] font-mono px-1 rounded bg-[#30363D] text-[#e1e2ec]">${appState.source_mode || 'SIM'}</span>
+                <div class="bg-[#0d1117] border border-[#30363d] rounded-md p-2.5 flex justify-between items-center shadow-sm">
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-[10px] font-mono font-bold text-[#8b949e] w-14">${dir.substring(0,5)}</span>
+                        <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded border ${sigBadge}">${appState.signal_state}</span>
+                        <span class="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#161b22] border border-[#30363d] ${modeBadge}">${appState.source_mode || 'SIM'}</span>
                     </div>
-                    <div class="flex items-center gap-3 font-mono text-[11px]">
-                        <div class="flex flex-col items-end"><span class="text-[#8c909f] text-[8px]">PCU</span><span class="text-white">${appState.queue_pcu.toFixed(1)}</span></div>
-                        <div class="flex flex-col items-end"><span class="text-[#8c909f] text-[8px]">DLY</span><span class="text-white">${appState.avg_delay_seconds.toFixed(1)}s</span></div>
+                    <div class="flex items-center gap-4 font-mono text-xs">
+                        <div class="flex flex-col items-end">
+                            <span class="text-[#8b949e] text-[8px] uppercase">Queue</span>
+                            <span class="text-white font-semibold">${appState.queue_pcu.toFixed(1)} <span class="text-[9px] text-[#8b949e]">PCU</span></span>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="text-[#8b949e] text-[8px] uppercase">Delay</span>
+                            <span class="text-white font-semibold">${appState.avg_delay_seconds.toFixed(1)}s</span>
+                        </div>
                     </div>
                 </div>
             `;
@@ -345,32 +546,31 @@ function renderJunctionDetail(id) {
         }
     });
 
-    // Network Effect & AURA Decision
-    const bp = jState.aura.back_pressure_multiplier;
-    const util = Math.round((1.0 - bp) * 100); // Rough approximation for display if util isn't directly exposed
-    
-    document.getElementById('drawer-backpressure').textContent = bp < 1.0 ? `HIGH (BP: ${bp.toFixed(2)})` : "NOMINAL";
-    if (bp < 1.0) {
-        document.getElementById('drawer-backpressure').className = "font-mono text-[#EF4444] font-bold bg-[#EF4444]/10 px-2 py-0.5 rounded";
+    // AURA Decision & Saturation
+    const bp = jState.aura.back_pressure_multiplier || 1.0;
+    const bpElem = document.getElementById('drawer-backpressure');
+    if (bp < 0.8) {
+        bpElem.textContent = `HIGH CONGESTION (BP: ${bp.toFixed(2)})`;
+        bpElem.className = "font-mono text-[#EF4444] font-bold bg-[#EF4444]/10 px-2 py-0.5 rounded border border-[#EF4444]/30";
     } else {
-        document.getElementById('drawer-backpressure').className = "font-mono text-[#10B981] font-bold bg-[#10B981]/10 px-2 py-0.5 rounded";
+        bpElem.textContent = "NOMINAL CAPACITY (BP: 1.00)";
+        bpElem.className = "font-mono text-[#10B981] font-bold bg-[#10B981]/10 px-2 py-0.5 rounded border border-[#10B981]/30";
     }
 
     document.getElementById('drawer-explanation').textContent = generateAuraExplanation(jState);
 
-    // Evidence
-    // Find the primary source across approaches
-    let source = "SIMULATED";
+    // Evidence Provenance
+    let primarySource = "SIMULATED";
     let totalPcu = 0;
     dirs.forEach(dir => {
         if (jState.aura.approaches[dir]) {
-            if (jState.aura.approaches[dir].source_mode === "LIVE") source = "LIVE";
-            else if (jState.aura.approaches[dir].source_mode === "REPLAY" && source !== "LIVE") source = "REPLAY";
+            if (jState.aura.approaches[dir].source_mode === "LIVE") primarySource = "LIVE";
+            else if (jState.aura.approaches[dir].source_mode === "REPLAY" && primarySource !== "LIVE") primarySource = "REPLAY";
             totalPcu += jState.aura.approaches[dir].queue_pcu;
         }
     });
 
-    document.getElementById('ev-source').textContent = source;
+    document.getElementById('ev-source').textContent = primarySource;
     document.getElementById('ev-pcu').textContent = `${totalPcu.toFixed(1)} PCU`;
     document.getElementById('ev-timestamp').textContent = new Date().toLocaleTimeString();
 }
@@ -388,31 +588,42 @@ function generateAuraExplanation(jState) {
     });
 
     if (bp < 0.8) {
-        return `Downstream congestion detected. Applied back-pressure penalty (x${bp}) to restrict incoming volume and prevent spillback.`;
-    } else if (maxQ > 30) {
-        return `High localized demand on ${bottleneckDir} approach (${maxQ.toFixed(1)} PCU). AURA dynamically prioritizing phase allocation.`;
+        return `Downstream saturation detected along arterial corridor. Applied backpressure penalty (x${bp.toFixed(2)}) to meter incoming traffic and prevent spillback.`;
+    } else if (maxQ > 20) {
+        return `Elevated demand detected on ${bottleneckDir} approach (${maxQ.toFixed(1)} PCU). AURA actively extending green time allocation.`;
     } else {
-        return `Network capacity nominal. AURA allocating standard proportional green times to balance flows.`;
+        return `Corridor flows operating within nominal bounds. AURA synchronizing green wave progression across adjacent junctions.`;
     }
 }
 
+// -------------------------------------------------------------
+// Green Wave Progression Panel (Bottom-Left)
+// -------------------------------------------------------------
 function updateGreenWavePanel(gwData) {
     const grid = document.getElementById('green-wave-grid');
+    if (!grid || !gwData) return;
+    
     grid.innerHTML = '';
     
     Object.keys(gwData).forEach(jid => {
         const data = gwData[jid];
-        const color = data.state === "GREEN" ? "text-[#10B981]" : "text-[#EF4444]";
+        const isGreen = data.state === "GREEN";
+        const stateColor = isGreen ? "text-[#10B981] bg-[#10B981]/10 border-[#10B981]/30" : "text-[#EF4444] bg-[#EF4444]/10 border-[#EF4444]/30";
+        
         const html = `
-            <div class="bg-[#0B0E14] border border-[#30363D] rounded p-2 flex justify-between items-center">
-                <span class="text-[10px] font-bold text-[#8c909f]">${jid}</span>
-                <span class="text-[10px] font-mono font-bold ${color}">${data.offset}s ${data.state}</span>
+            <div class="bg-[#161b22] border border-[#30363d] rounded p-2 flex justify-between items-center shadow-sm">
+                <span class="text-[10px] font-mono font-bold text-white">${jid}</span>
+                <span class="text-[9px] font-mono font-semibold text-[#8b949e]">${data.offset}s</span>
+                <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${stateColor}">${data.state}</span>
             </div>
         `;
         grid.insertAdjacentHTML('beforeend', html);
     });
 }
 
+// -------------------------------------------------------------
+// Provenance / Data Source Badge Update
+// -------------------------------------------------------------
 function updateDataSourceLabel(networkState) {
     let hasLive = false;
     let hasReplay = false;
@@ -425,106 +636,118 @@ function updateDataSourceLabel(networkState) {
     });
 
     if (hasLive) {
-        dataSourceLabel.textContent = "DATA: LIVE";
-        dataSourceLabel.className = "text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-[#10B981]/50 bg-[#10B981]/10 text-[#10B981]";
+        dataSourceLabel.textContent = "DATA: LIVE VISION";
+        dataSourceLabel.className = "text-[10px] font-mono font-bold px-2.5 py-1 rounded border border-[#10B981]/50 bg-[#10B981]/20 text-[#10B981]";
     } else if (hasReplay) {
-        dataSourceLabel.textContent = "DATA: REPLAY";
-        dataSourceLabel.className = "text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-[#F59E0B]/50 bg-[#F59E0B]/10 text-[#F59E0B]";
+        dataSourceLabel.textContent = "DATA: REPLAY VIDEO";
+        dataSourceLabel.className = "text-[10px] font-mono font-bold px-2.5 py-1 rounded border border-[#F59E0B]/50 bg-[#F59E0B]/20 text-[#F59E0B]";
     } else {
         dataSourceLabel.textContent = "DATA: SIMULATED";
-        dataSourceLabel.className = "text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#32353c] text-[#8c909f] border border-[#424754]";
+        dataSourceLabel.className = "text-[10px] font-mono font-bold px-2.5 py-1 rounded bg-[#161b22] text-[#8b949e] border border-[#30363d]";
     }
 }
 
-// User View Routing
+// -------------------------------------------------------------
+// User View (Driver Destination & Routing)
+// -------------------------------------------------------------
 function populateRoutingSelects(graphData) {
     const dest = document.getElementById('user-destination');
     dest.innerHTML = '';
     
-    // Add default prompt option
-    const defaultOpt = new Option('Select a destination...', '');
+    const defaultOpt = new Option('Choose destination landmark / area...', '');
     defaultOpt.disabled = true;
     defaultOpt.selected = true;
     dest.add(defaultOpt);
     
-    const groups = {
-        'Hospitals': { types: ['hospital', 'clinic'], prefix: '🏥' },
-        'Fire & Rescue': { types: ['fire_station'], prefix: '🚒' },
-        'Police': { types: ['police'], prefix: '👮' }
+    // Categorized destinations
+    const categories = {
+        'Major Hubs & Commercial Areas': [
+            { name: "Lulu Mall, Edappally", node: "2607681371" },
+            { name: "Jawaharlal Nehru Stadium, Kaloor", node: "5189960535" },
+            { name: "Maharajas College Ground, Ernakulam", node: "277170472" },
+            { name: "Vyttila Mobility Hub", node: "1906724170" },
+            { name: "Kadavanthra Junction Market", node: "11347887161" },
+            { name: "Palarivattom Bypass", node: "11199503227" }
+        ],
+        'Major Hospitals & Emergency Centers': [],
+        'Police & Transit Centers': []
     };
-    
-    Object.keys(groups).forEach(groupName => {
-        const groupInfo = groups[groupName];
-        const poisInGroup = graphData.pois.filter(p => groupInfo.types.includes(p.type));
-        
-        if (poisInGroup.length > 0) {
+
+    // Filter POIs into groups
+    if (graphData.pois) {
+        graphData.pois.forEach(p => {
+            if ((p.type === 'hospital' || p.type === 'clinic') && categories['Major Hospitals & Emergency Centers'].length < 20) {
+                categories['Major Hospitals & Emergency Centers'].push({ name: p.name, node: p.nearestNode });
+            } else if ((p.type === 'police' || p.type === 'fire_station') && categories['Police & Transit Centers'].length < 15) {
+                categories['Police & Transit Centers'].push({ name: p.name, node: p.nearestNode });
+            }
+        });
+    }
+
+    Object.keys(categories).forEach(catName => {
+        const items = categories[catName];
+        if (items.length > 0) {
             const optgroup = document.createElement('optgroup');
-            optgroup.label = groupName;
-            
-            // Sort alphabetically within the group
-            poisInGroup.sort((a, b) => a.name.localeCompare(b.name));
-            
-            poisInGroup.forEach(p => {
-                const opt = new Option(`${groupInfo.prefix} ${p.name}`, p.nearestNode);
+            optgroup.label = catName;
+            items.forEach(item => {
+                const opt = new Option(item.name, item.node);
                 optgroup.appendChild(opt);
             });
-            
             dest.appendChild(optgroup);
         }
     });
 }
 
-let userOriginMarker = null;
-
 function setOriginLocation(lat, lng) {
     store.userOriginLat = lat;
     store.userOriginLng = lng;
     
-    if (userOriginMarker) {
-        map.removeLayer(userOriginMarker);
-    }
+    if (userOriginMarker) map.removeLayer(userOriginMarker);
     
     userOriginMarker = L.marker([lat, lng], {
         icon: L.divIcon({
-            className: 'custom-div-icon',
-            html: '<div class="flex items-center justify-center w-4 h-4 rounded-full bg-[#10B981] border-2 border-white shadow-lg z-50"></div>',
+            className: 'user-pin-icon',
+            html: '<div class="w-4 h-4 rounded-full bg-[#10B981] border-2 border-white shadow-lg"></div>',
             iconSize: [16, 16],
             iconAnchor: [8, 8]
         })
     }).addTo(map);
-    userOriginMarker.bindTooltip("📍 START", { permanent: true, direction: "top", className: "junction-tooltip" }).openTooltip();
+    userOriginMarker.bindTooltip("📍 START POINT", { permanent: true, direction: "top", className: "aura-tooltip" }).openTooltip();
     
-    document.getElementById('origin-display').classList.remove('hidden');
-    document.getElementById('origin-display').textContent = `Origin set at ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    const disp = document.getElementById('origin-display');
+    disp.classList.remove('hidden');
+    disp.className = "text-xs font-mono text-[#10B981] px-3 py-2 bg-[#10B981]/10 rounded border border-[#10B981]/30";
+    disp.textContent = `Origin: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 }
 
 document.getElementById('btn-use-location').addEventListener('click', () => {
     if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(position => {
-            setOriginLocation(position.coords.latitude, position.coords.longitude);
-            map.flyTo([position.coords.latitude, position.coords.longitude], 15);
-        }, err => {
-            alert("Geolocation failed or denied. Defaulting to Edappally.");
+        navigator.geolocation.getCurrentPosition(pos => {
+            setOriginLocation(pos.coords.latitude, pos.coords.longitude);
+            map.flyTo([pos.coords.latitude, pos.coords.longitude], 14);
+        }, () => {
             // Default to near Edappally
             setOriginLocation(10.0261, 76.3084);
-            map.flyTo([10.0261, 76.3084], 15);
+            map.flyTo([10.0261, 76.3084], 14);
         });
+    } else {
+        setOriginLocation(10.0261, 76.3084);
+        map.flyTo([10.0261, 76.3084], 14);
     }
 });
 
-let isMapSelectionMode = false;
 document.getElementById('btn-map-origin').addEventListener('click', () => {
-    isMapSelectionMode = true;
+    isMapOriginSelectionMode = true;
     document.getElementById('map').style.cursor = 'crosshair';
-    document.getElementById('origin-display').classList.remove('hidden');
-    document.getElementById('origin-display').className = "text-xs font-mono text-[#F59E0B] px-3 py-2 bg-[#F59E0B]/10 rounded border border-[#F59E0B]/30";
-    document.getElementById('origin-display').textContent = "Click anywhere on a drivable Kochi road.";
+    const disp = document.getElementById('origin-display');
+    disp.classList.remove('hidden');
+    disp.className = "text-xs font-mono text-[#F59E0B] px-3 py-2 bg-[#F59E0B]/10 rounded border border-[#F59E0B]/30";
+    disp.textContent = "Click anywhere on a Kochi road to set START.";
 });
-
 
 document.getElementById('btn-user-route').addEventListener('click', () => {
     if (!store.userOriginLat || !store.userOriginLng) {
-        alert("Please select a starting location first.");
+        alert("Please select a starting point first.");
         return;
     }
     const dest = document.getElementById('user-destination').value;
@@ -546,51 +769,27 @@ function drawRoutePolylines(auraData, fastData) {
     routingLayer.clearLayers();
     if (!store.graph) return;
 
-    // Draw Fast path
+    // Draw Fast path (dashed amber)
     if (fastData && fastData.geometry && fastData.geometry.length > 0) {
         L.polyline(fastData.geometry, {
             color: '#F59E0B',
             weight: 4,
-            opacity: 0.6,
-            dashArray: '8, 8'
+            opacity: 0.7,
+            dashArray: '8, 8',
+            lineCap: 'round'
         }).addTo(routingLayer);
     }
 
-    // Draw AURA path
+    // Draw AURA path (solid glowing green)
     if (auraData && auraData.geometry && auraData.geometry.length > 0) {
         L.polyline(auraData.geometry, {
             color: '#10B981',
             weight: 6,
-            opacity: 0.9
+            opacity: 0.95,
+            lineCap: 'round'
         }).addTo(routingLayer);
     }
 }
-
-// WebSocket Handling
-ws.onopen = () => {
-    connectionStatus.textContent = "● CONNECTED";
-    connectionStatus.className = "text-[9px] font-mono font-bold text-[#10B981] px-1";
-};
-
-ws.onclose = () => {
-    connectionStatus.textContent = "● DISCONNECTED";
-    connectionStatus.className = "text-[9px] font-mono font-bold text-[#EF4444] px-1";
-};
-
-ws.onmessage = (evt) => {
-    try {
-        const payload = JSON.parse(evt.data);
-        if (payload.event === "GRAPH_DATA") {
-            store.updateGraph(payload.data);
-        } else if (payload.event === "SIMULATED_TRAFFIC_STATE") {
-            store.updateTrafficState(payload.data);
-        } else if (payload.event === "ROUTE_RESULT") {
-            handleRouteResult(payload.data);
-        }
-    } catch (e) {
-        console.error("WS parse error", e);
-    }
-};
 
 function handleRouteResult(data) {
     if (data.error) {
@@ -603,25 +802,17 @@ function handleRouteResult(data) {
     const aura = data.aura;
     const fast = data.individual;
 
-    const auraJuncs = aura.controlledJunctionsPassed.map(j => `<span class="px-2 py-0.5 bg-[#161B22] border border-[#30363D] rounded text-white text-[10px]">${j.id} ${j.name}</span>`).join(' ➔ ');
+    const auraJuncs = aura.controlledJunctionsPassed.map(j => `<span class="px-2 py-0.5 bg-[#161b22] border border-[#30363d] rounded text-white text-[10px] font-mono font-bold">${j.id}</span>`).join(' ➔ ');
     const fastJuncs = fast.controlledJunctionsPassed.map(j => j.id).join(' → ');
 
     document.getElementById('aura-time').textContent = `${Math.ceil(aura.estimatedTime / 60)} min`;
-    document.getElementById('aura-path').innerHTML = auraJuncs || "No controlled junctions on route";
+    document.getElementById('aura-path').innerHTML = auraJuncs || "<span class='text-[#8b949e]'>Direct Arterial (No Bottleneck Junctions)</span>";
     document.getElementById('aura-explanation').textContent = aura.explanation || "AURA cooperative routing applied.";
     
     document.getElementById('fast-time').textContent = `${Math.ceil(fast.estimatedTime / 60)} min`;
-    document.getElementById('fast-path').textContent = fastJuncs || "Direct Route";
-    document.getElementById('fast-explanation').textContent = fast.explanation || "Shortest path without cooperative penalties.";
+    document.getElementById('fast-path').textContent = fastJuncs ? `Junctions: ${fastJuncs}` : "Direct Shortest Route";
+    document.getElementById('fast-explanation').textContent = fast.explanation || "Shortest direct path without cooperative network smoothing.";
     
-    if (Math.ceil(aura.estimatedTime / 60) > Math.ceil(fast.estimatedTime / 60)) {
-        document.getElementById('aura-diff').textContent = `+${Math.round((aura.estimatedTime - fast.estimatedTime))}s DELAY`;
-        document.getElementById('fast-diff').textContent = "FASTEST";
-    } else {
-        document.getElementById('aura-diff').textContent = "OPTIMAL";
-        document.getElementById('fast-diff').textContent = "SUB-OPTIMAL";
-    }
-
     drawRoutePolylines(aura, fast);
 }
 
@@ -637,3 +828,31 @@ document.getElementById('btn-toggle-insights').addEventListener('click', () => {
         icon.textContent = '▲';
     }
 });
+
+// -------------------------------------------------------------
+// WebSocket Live Telemetry Connection
+// -------------------------------------------------------------
+ws.onopen = () => {
+    connectionStatus.textContent = "● CONNECTED";
+    connectionStatus.className = "text-[10px] font-mono font-bold text-[#10B981] px-2.5 py-1 rounded bg-[#161b22] border border-[#10B981]/30";
+};
+
+ws.onclose = () => {
+    connectionStatus.textContent = "● DISCONNECTED";
+    connectionStatus.className = "text-[10px] font-mono font-bold text-[#EF4444] px-2.5 py-1 rounded bg-[#161b22] border border-[#EF4444]/30";
+};
+
+ws.onmessage = (evt) => {
+    try {
+        const payload = JSON.parse(evt.data);
+        if (payload.event === "GRAPH_DATA") {
+            store.updateGraph(payload.data);
+        } else if (payload.event === "SIMULATED_TRAFFIC_STATE") {
+            store.updateTrafficState(payload.data);
+        } else if (payload.event === "ROUTE_RESULT") {
+            handleRouteResult(payload.data);
+        }
+    } catch (e) {
+        console.error("WebSocket payload error", e);
+    }
+};

@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AURA Control Room</title>
+    <title>AURA — Adaptive Urban Routing Architecture | Kochi Network</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -14,268 +14,311 @@
         /* Custom scrollbar */
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #424754; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #8c909f; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #484f58; }
         
-        /* Leaflet overrides */
-        .leaflet-container { background: #0b0e15 !important; }
-        .junction-tooltip {
-            background: rgba(22, 27, 34, 0.95) !important;
-            border: 1px solid #30363D !important;
-            color: #e1e2ec !important;
+        /* High-contrast dark OpenStreetMap tile filter - 100% Keyless, zero watermarks */
+        .leaflet-container { background: #07090e !important; }
+        .osm-dark-tiles .leaflet-tile {
+            filter: brightness(0.62) invert(1) contrast(2.6) hue-rotate(200deg) saturate(0.25) brightness(0.8);
+        }
+        
+        /* Tooltips */
+        .aura-tooltip {
+            background: rgba(13, 17, 23, 0.95) !important;
+            border: 1px solid #30363d !important;
+            color: #f0f6fc !important;
             font-family: 'JetBrains Mono', monospace !important;
             font-size: 11px !important;
-            font-weight: 500 !important;
+            font-weight: 600 !important;
             padding: 4px 8px !important;
-            border-radius: 4px !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+            border-radius: 6px !important;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6) !important;
             white-space: nowrap;
         }
-        .junction-tooltip::before { border-top-color: rgba(22, 27, 34, 0.95) !important; }
+        .aura-tooltip::before { border-top-color: rgba(13, 17, 23, 0.95) !important; }
         
         /* Signal glow animations */
-        @keyframes pulse-red { 0% { box-shadow: 0 0 8px 2px rgba(239,68,68,0.4); } 50% { box-shadow: 0 0 12px 4px rgba(239,68,68,0.6); } 100% { box-shadow: 0 0 8px 2px rgba(239,68,68,0.4); } }
-        @keyframes pulse-green { 0% { box-shadow: 0 0 8px 2px rgba(16,185,129,0.4); } 50% { box-shadow: 0 0 12px 4px rgba(16,185,129,0.6); } 100% { box-shadow: 0 0 8px 2px rgba(16,185,129,0.4); } }
+        @keyframes pulse-signal-green {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        @keyframes pulse-signal-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .signal-green { background-color: #10B981; animation: pulse-signal-green 2s infinite; }
+        .signal-red { background-color: #EF4444; animation: pulse-signal-red 2s infinite; }
         
-        .signal-red { background-color: #EF4444; animation: pulse-red 2s infinite; }
-        .signal-green { background-color: #10B981; animation: pulse-green 2s infinite; }
-        
-        /* Route dash animation */
+        /* Queue blip animations */
+        @keyframes blip-glow {
+            0%, 100% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+        .queue-blip { animation: blip-glow 1.5s ease-in-out infinite; }
+
+        /* Route Dash Animation */
         @keyframes dash-anim { to { stroke-dashoffset: -20; } }
-        .route-dash { stroke-dasharray: 6 6; animation: dash-anim 1s linear infinite; }
+        .route-dash { stroke-dasharray: 8 8; animation: dash-anim 1.2s linear infinite; }
     </style>
 </head>
-<body class="bg-[#0b0e15] text-[#e1e2ec] h-screen w-screen overflow-hidden flex flex-col antialiased selection:bg-[#3B82F6] selection:text-white">
+<body class="bg-[#07090e] text-[#e6edf3] h-screen w-screen overflow-hidden flex flex-col antialiased selection:bg-[#3B82F6] selection:text-white">
 
     <!-- Header -->
-    <nav class="h-14 border-b border-[#30363D] bg-[#161B22] flex items-center justify-between px-6 shrink-0 z-50 relative">
+    <nav class="h-14 border-b border-[#30363d] bg-[#0d1117] flex items-center justify-between px-6 shrink-0 z-50 relative shadow-md">
         <div class="flex items-center gap-8">
-            <div class="text-xl font-bold text-[#3B82F6] tracking-tight">AURA Kochi Network</div>
-            <div class="flex gap-6 mt-1">
-                <button id="tab-control-room" class="text-sm font-semibold border-b-2 border-[#3B82F6] pb-1.5 text-[#3B82F6] transition-colors">Control Room</button>
-                <button id="tab-user-view" class="text-sm font-semibold border-b-2 border-transparent pb-1.5 text-[#8c909f] hover:text-[#e1e2ec] transition-colors">User View</button>
-            </div>
-        </div>
-        <div class="flex gap-5 items-center">
-            <!-- Global Controls -->
-            <div class="flex gap-2 bg-[#0B0E14] p-1 rounded border border-[#30363D]">
-                <button id="btn-start" class="px-3 py-1 bg-[#10B981] hover:bg-[#059669] text-white text-[10px] tracking-wider rounded font-bold cursor-pointer transition-colors" title="Start Simulation">START</button>
+            <div class="flex items-center gap-3">
+                <div class="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#1E40AF] to-[#3B82F6] flex items-center justify-center shadow-lg border border-[#60A5FA]/40">
+                    <span class="text-white font-extrabold text-xs tracking-wider">A</span>
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-base font-bold text-white tracking-tight leading-none">AURA <span class="text-[#3B82F6] font-semibold text-xs ml-1">Kochi Network</span></span>
+                    <span class="text-[9px] font-mono text-[#8b949e] uppercase tracking-wider">Adaptive Urban Routing</span>
+                </div>
             </div>
             
-            <div class="flex gap-2 bg-[#0B0E14] p-1 rounded border border-[#30363D] items-center px-3">
-                <span class="text-[10px] text-[#8c909f] font-bold tracking-widest uppercase mr-1">CONTROL MODE:</span>
-                <span class="text-[10px] text-[#3B82F6] font-bold tracking-widest uppercase">AURA COOPERATIVE</span>
+            <div class="flex gap-2">
+                <button id="tab-control-room" class="text-xs font-bold px-3 py-1.5 rounded-md border border-[#3B82F6] bg-[#1E3A8A]/30 text-[#60A5FA] transition-all flex items-center gap-1.5 shadow-sm">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    Control Room
+                </button>
+                <button id="tab-user-view" class="text-xs font-semibold px-3 py-1.5 rounded-md border border-transparent text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-all flex items-center gap-1.5">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                    User View
+                </button>
+            </div>
+        </div>
+
+        <div class="flex gap-4 items-center">
+            <!-- Control Mode Indicator -->
+            <div class="flex items-center gap-2 bg-[#161b22] px-3 py-1 rounded-md border border-[#30363d]">
+                <span class="w-2 h-2 rounded-full bg-[#3B82F6] animate-pulse"></span>
+                <span class="text-[10px] text-[#8b949e] font-bold tracking-wider uppercase">CONTROL:</span>
+                <span class="text-[10px] text-[#60A5FA] font-mono font-bold tracking-wider uppercase">AURA COOPERATIVE</span>
             </div>
 
-            <div class="w-px h-6 bg-[#30363D] mx-1"></div>
-
-            <div class="flex flex-col items-end gap-0.5">
-                <div class="flex items-center gap-2">
-                    <div class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#32353c] text-[#8c909f] border border-[#424754]">MAP DATA: OPENSTREETMAP</div>
-                    <div id="data-source" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#32353c] text-[#8c909f] border border-[#424754]">TRAFFIC: SIMULATED</div>
+            <!-- Provenance / Source Badges -->
+            <div class="flex items-center gap-2">
+                <div class="text-[10px] font-mono font-semibold px-2.5 py-1 rounded bg-[#161b22] text-[#8b949e] border border-[#30363d] flex items-center gap-1.5">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
+                    OSM REAL NETWORK
                 </div>
-                <div id="connection-status" class="text-[9px] font-mono font-bold text-[#F59E0B] px-1">● CONNECTING...</div>
+                <div id="data-source" class="text-[10px] font-mono font-bold px-2.5 py-1 rounded bg-[#161b22] text-[#8b949e] border border-[#30363d] transition-colors">
+                    DATA: SIMULATED
+                </div>
+                <div id="connection-status" class="text-[10px] font-mono font-bold text-[#F59E0B] px-2 py-1 rounded bg-[#161b22] border border-[#30363d]">
+                    ● CONNECTING
+                </div>
             </div>
         </div>
     </nav>
 
-    <!-- Main Container -->
+    <!-- Main Viewport Area -->
     <main class="flex-1 relative flex flex-col overflow-hidden">
         
-        <!-- Control Room Top Metrics -->
-        <div id="top-metrics" class="h-[46px] border-b border-[#30363D] bg-[#161B22]/90 flex items-center px-6 gap-10 z-40 relative backdrop-blur-sm">
+        <!-- Control Room Top Metrics Strip -->
+        <div id="top-metrics" class="h-[44px] border-b border-[#30363d] bg-[#0d1117]/95 backdrop-blur-md flex items-center px-6 gap-8 z-40 relative shrink-0">
             <div class="flex items-center gap-3">
-                <span class="text-[#8c909f] text-[10px] font-bold tracking-widest uppercase">Avg Control Delay</span>
-                <span id="metric-delay" class="font-mono text-sm font-semibold text-white">--</span>
+                <span class="text-[#8b949e] text-[10px] font-bold tracking-widest uppercase">Avg Control Delay</span>
+                <span id="metric-delay" class="font-mono text-sm font-bold text-white">--</span>
             </div>
+            <div class="w-px h-4 bg-[#30363d]"></div>
             <div class="flex items-center gap-3">
-                <span class="text-[#8c909f] text-[10px] font-bold tracking-widest uppercase">Max Demand (PCU)</span>
-                <span id="metric-demand" class="font-mono text-sm font-semibold text-[#F59E0B]">--</span>
+                <span class="text-[#8b949e] text-[10px] font-bold tracking-widest uppercase">Max Demand</span>
+                <span id="metric-demand" class="font-mono text-sm font-bold text-[#F59E0B]">-- PCU</span>
             </div>
+            <div class="w-px h-4 bg-[#30363d]"></div>
             <div class="flex items-center gap-3">
-                <span class="text-[#8c909f] text-[10px] font-bold tracking-widest uppercase">Spillback Events</span>
-                <span id="metric-spillbacks" class="font-mono text-sm font-semibold text-[#EF4444]">--</span>
+                <span class="text-[#8b949e] text-[10px] font-bold tracking-widest uppercase">Spillback Events</span>
+                <span id="metric-spillbacks" class="font-mono text-sm font-bold text-[#EF4444]">--</span>
+            </div>
+            <div class="w-px h-4 bg-[#30363d]"></div>
+            <div class="flex items-center gap-3">
+                <span class="text-[#8b949e] text-[10px] font-bold tracking-widest uppercase">Active Corridors</span>
+                <span class="font-mono text-xs font-bold text-[#10B981]">6 JUNCTIONS (EDAPPALLY – VYTTILA)</span>
             </div>
             <div class="flex-1"></div>
-            <div class="flex items-center gap-3 bg-[#0B0E14] px-3 py-1 rounded border border-[#30363D]">
-                <span class="text-[#8c909f] text-[10px] font-bold tracking-widest uppercase">Mode</span>
-                <span id="metric-mode" class="font-mono text-xs font-bold text-[#3B82F6]">AURA COOPERATIVE</span>
+            <div class="flex items-center gap-2">
+                <span class="text-[10px] font-mono text-[#8b949e]">EMERGENCY POIs:</span>
+                <span class="text-[10px] font-mono text-white bg-[#161b22] px-2 py-0.5 rounded border border-[#30363d]">🏥 86 Hospitals · 🚒 2 Fire · 👮 18 Police</span>
             </div>
         </div>
 
-        <!-- Workspace Layer -->
+        <!-- Full Map Workspace -->
         <div class="flex-1 relative flex">
-            <!-- Leaflet Map Container -->
-            <div id="map" class="absolute inset-0 z-0 bg-[#0B0E14]"></div>
-            
-            <!-- Vignette -->
-            <div class="absolute inset-0 pointer-events-none z-10 shadow-[inset_0_0_120px_rgba(11,14,20,0.9)]"></div>
+            <!-- Map Container -->
+            <div id="map" class="absolute inset-0 z-0 bg-[#07090e]"></div>
 
-            <!-- Overlay: Control Room Detail Drawer -->
-            <div id="drawer-control" class="absolute right-0 top-0 bottom-0 w-[420px] bg-[#161B22]/95 backdrop-blur-md border-l border-[#30363D] z-30 transform translate-x-full transition-transform duration-300 flex flex-col shadow-2xl">
+            <!-- Soft Map Vignette -->
+            <div class="absolute inset-0 pointer-events-none z-10 shadow-[inset_0_0_80px_rgba(7,9,14,0.85)]"></div>
+
+            <!-- Overlay: Junction Detail Drawer (Right) -->
+            <div id="drawer-control" class="absolute right-0 top-0 bottom-0 w-[420px] bg-[#0d1117]/95 backdrop-blur-md border-l border-[#30363d] z-30 transform translate-x-full transition-transform duration-300 flex flex-col shadow-2xl">
                 <!-- Drawer Header -->
-                <div class="p-5 border-b border-[#30363D] flex justify-between items-start shrink-0 bg-[#0B0E14]/50">
+                <div class="p-5 border-b border-[#30363d] flex justify-between items-start shrink-0 bg-[#161b22]/70">
                     <div class="flex flex-col gap-1">
                         <div class="flex items-center gap-2">
-                            <span id="drawer-jid" class="px-1.5 py-0.5 bg-[#30363D] text-[#e1e2ec] text-[10px] font-mono font-bold rounded">--</span>
-                            <h2 id="drawer-title" class="text-lg font-bold text-white">Select Junction</h2>
+                            <span id="drawer-jid" class="px-2 py-0.5 bg-[#3B82F6] text-white text-[11px] font-mono font-bold rounded shadow-sm">--</span>
+                            <h2 id="drawer-title" class="text-base font-bold text-white tracking-tight">Select Junction</h2>
                         </div>
-                        <div class="text-xs text-[#8c909f] font-mono mt-1 flex items-center gap-2">
-                            CURRENT PHASE: <span id="drawer-phase" class="px-2 py-0.5 bg-[#3B82F6]/20 text-[#3B82F6] font-bold rounded border border-[#3B82F6]/30">--</span>
+                        <div class="text-xs text-[#8b949e] font-mono mt-1 flex items-center gap-2">
+                            PHASE: <span id="drawer-phase" class="px-2 py-0.5 bg-[#3B82F6]/20 text-[#60A5FA] font-bold rounded border border-[#3B82F6]/30">--</span>
                         </div>
-                        <div class="text-[10px] text-white font-mono mt-0.5 font-bold" id="drawer-phase-desc">
+                        <div class="text-[10px] text-[#f0f6fc] font-mono mt-0.5 font-semibold" id="drawer-phase-desc">
                             ACTIVE MOVEMENTS: --
                         </div>
                     </div>
-                    <button id="btn-close-drawer" class="text-[#8c909f] hover:text-white p-1 rounded hover:bg-[#30363D] transition-colors">
+                    <button id="btn-close-drawer" class="text-[#8b949e] hover:text-white p-1 rounded hover:bg-[#30363d] transition-colors">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
                     </button>
                 </div>
 
                 <!-- Drawer Content -->
-                <div id="drawer-content" class="flex-1 overflow-y-auto p-5 flex flex-col gap-8 custom-scrollbar">
+                <div id="drawer-content" class="flex-1 overflow-y-auto p-5 flex flex-col gap-6 custom-scrollbar">
                     
-                    <!-- LEVEL 1: Four-Way Signal Visual -->
-                    <div class="flex flex-col gap-3">
-                        <h3 class="text-[10px] font-bold tracking-widest text-[#8c909f] uppercase flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-[#3B82F6]"></span> Intersection State
+                    <!-- 4-Way Signal Visualizer -->
+                    <div class="flex flex-col gap-2.5">
+                        <h3 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#3B82F6]"></span> 4-Way Signal Status
                         </h3>
-                        <div class="bg-[#0B0E14] border border-[#30363D] rounded-lg p-4 relative h-56 flex items-center justify-center shadow-inner">
-                            <!-- Intersection lines -->
+                        <div class="bg-[#161b22] border border-[#30363d] rounded-lg p-4 relative h-52 flex items-center justify-center shadow-inner">
+                            <!-- Road Cross Visual -->
                             <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                <div class="w-full h-12 border-y-2 border-dashed border-[#30363D]"></div>
-                                <div class="h-full w-12 border-x-2 border-dashed border-[#30363D] absolute"></div>
+                                <div class="w-full h-14 bg-[#0d1117] border-y border-dashed border-[#30363d]"></div>
+                                <div class="h-full w-14 bg-[#0d1117] border-x border-dashed border-[#30363d] absolute"></div>
                             </div>
                             
                             <!-- Northbound -->
-                            <div class="absolute top-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5">
-                                <span class="text-[10px] text-[#8c909f] font-mono font-bold">NORTH</span>
-                                <div id="sig-NORTHBOUND" class="w-5 h-5 rounded-full bg-[#30363D] border border-[#424754]"></div>
+                            <div class="absolute top-2.5 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-10">
+                                <span class="text-[9px] text-[#8b949e] font-mono font-bold">NORTH</span>
+                                <div id="sig-NORTHBOUND" class="w-5 h-5 rounded-full bg-[#21262d] border border-[#30363d]"></div>
                             </div>
                             <!-- Southbound -->
-                            <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5">
-                                <div id="sig-SOUTHBOUND" class="w-5 h-5 rounded-full bg-[#30363D] border border-[#424754]"></div>
-                                <span class="text-[10px] text-[#8c909f] font-mono font-bold">SOUTH</span>
+                            <div class="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-10">
+                                <div id="sig-SOUTHBOUND" class="w-5 h-5 rounded-full bg-[#21262d] border border-[#30363d]"></div>
+                                <span class="text-[9px] text-[#8b949e] font-mono font-bold">SOUTH</span>
                             </div>
                             <!-- Eastbound -->
-                            <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                <div id="sig-EASTBOUND" class="w-5 h-5 rounded-full bg-[#30363D] border border-[#424754]"></div>
-                                <span class="text-[10px] text-[#8c909f] font-mono font-bold">EAST</span>
+                            <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
+                                <div id="sig-EASTBOUND" class="w-5 h-5 rounded-full bg-[#21262d] border border-[#30363d]"></div>
+                                <span class="text-[9px] text-[#8b949e] font-mono font-bold">EAST</span>
                             </div>
                             <!-- Westbound -->
-                            <div class="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                <span class="text-[10px] text-[#8c909f] font-mono font-bold">WEST</span>
-                                <div id="sig-WESTBOUND" class="w-5 h-5 rounded-full bg-[#30363D] border border-[#424754]"></div>
+                            <div class="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
+                                <span class="text-[9px] text-[#8b949e] font-mono font-bold">WEST</span>
+                                <div id="sig-WESTBOUND" class="w-5 h-5 rounded-full bg-[#21262d] border border-[#30363d]"></div>
                             </div>
 
-                            <!-- Center Hub -->
-                            <div class="w-10 h-10 bg-[#161B22] z-10 border border-[#424754] rounded flex items-center justify-center shadow-lg">
+                            <!-- Center Node Badge -->
+                            <div class="w-11 h-11 bg-[#0d1117] z-20 border border-[#3B82F6]/60 rounded-md flex flex-col items-center justify-center shadow-lg">
                                 <span id="center-sig-id" class="text-[11px] font-mono font-bold text-white">--</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- LEVEL 2: Traffic / Approaches Data -->
-                    <div class="flex flex-col gap-3">
-                        <div class="flex justify-between items-end mb-1">
-                            <h3 class="text-[10px] font-bold tracking-widest text-[#8c909f] uppercase flex items-center gap-2">
-                                <span class="w-2 h-2 rounded-full bg-[#F59E0B]"></span> Approach Telemetry
+                    <!-- Approach Telemetry -->
+                    <div class="flex flex-col gap-2.5">
+                        <div class="flex justify-between items-end">
+                            <h3 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 rounded-full bg-[#F59E0B]"></span> Approach Telemetry
                             </h3>
-                            <span class="text-[9px] font-mono text-[#424754]">PCU / QUEUE / DELAY</span>
+                            <span class="text-[9px] font-mono text-[#8b949e]">PCU / QUEUE / DELAY</span>
                         </div>
                         <div id="drawer-approaches" class="flex flex-col gap-2">
-                            <!-- Populated by JS -->
+                            <!-- Populated dynamically -->
                         </div>
                     </div>
 
-                    <!-- LEVEL 3 & 4: Network Effect & AURA Decision -->
-                    <div class="flex flex-col gap-3">
-                        <h3 class="text-[10px] font-bold tracking-widest text-[#8c909f] uppercase flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-[#8B5CF6]"></span> Why AURA Acted
+                    <!-- AURA Dynamic Reasoning -->
+                    <div class="flex flex-col gap-2.5">
+                        <h3 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#8B5CF6]"></span> AURA Signal Decision
                         </h3>
-                        <div class="bg-[#10131a] border border-[#3B82F6]/40 rounded-lg p-4 flex flex-col gap-3 shadow-[0_0_15px_rgba(59,130,246,0.05)]">
-                            <div class="flex justify-between items-center text-xs border-b border-[#30363D] pb-2">
-                                <span class="text-[#8c909f] font-medium">Downstream Saturation</span>
-                                <span id="drawer-backpressure" class="font-mono text-[#F59E0B] font-bold bg-[#F59E0B]/10 px-2 py-0.5 rounded">--</span>
+                        <div class="bg-[#161b22] border border-[#3B82F6]/40 rounded-lg p-4 flex flex-col gap-3 shadow-[0_0_15px_rgba(59,130,246,0.06)]">
+                            <div class="flex justify-between items-center text-xs border-b border-[#30363d] pb-2">
+                                <span class="text-[#8b949e] font-medium">Downstream Saturation</span>
+                                <span id="drawer-backpressure" class="font-mono text-[#10B981] font-bold bg-[#10B981]/10 px-2 py-0.5 rounded">NOMINAL</span>
                             </div>
-                            <div class="text-sm text-white font-medium leading-relaxed flex items-start gap-2 mt-1">
-                                <svg class="mt-0.5 shrink-0 text-[#3B82F6]" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                                <span id="drawer-explanation">Awaiting state data...</span>
+                            <div class="text-xs text-[#f0f6fc] font-medium leading-relaxed flex items-start gap-2.5">
+                                <svg class="mt-0.5 shrink-0 text-[#3B82F6]" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                                <span id="drawer-explanation">Awaiting live state telemetry...</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- LEVEL 5: Evidence -->
-                    <div class="flex flex-col gap-3 pb-4">
-                        <h3 class="text-[10px] font-bold tracking-widest text-[#8c909f] uppercase flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-[#10B981]"></span> Camera Evidence
+                    <!-- Sensor / Camera Evidence -->
+                    <div class="flex flex-col gap-2.5 pb-2">
+                        <h3 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#10B981]"></span> Perception Provenance
                         </h3>
-                        <div class="bg-[#0B0E14] border border-[#30363D] rounded-lg overflow-hidden">
-                            <div class="bg-[#161B22] p-3 border-b border-[#30363D] flex items-center gap-3">
-                                <svg class="text-[#8c909f]" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12A10 10 0 0 0 15 21.5M22 12A10 10 0 0 0 9 2.5M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                                <span class="text-[11px] text-[#8c909f] font-mono leading-tight">No synchronized camera frame available for this source.</span>
+                        <div class="bg-[#161b22] border border-[#30363d] rounded-lg p-3.5 flex flex-col gap-2 text-xs">
+                            <div class="flex justify-between items-center pb-2 border-b border-[#21262d]">
+                                <span class="text-[#8b949e]">Input Source</span> 
+                                <span id="ev-source" class="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-[#21262d] text-white">--</span>
                             </div>
-                            <div class="p-4 flex flex-col gap-2 text-xs">
-                                <div class="flex justify-between items-center pb-2 border-b border-[#161B22]">
-                                    <span class="text-[#8c909f] font-medium">Source Mode</span> 
-                                    <span id="ev-source" class="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-[#30363D] text-[#e1e2ec]">--</span>
-                                </div>
-                                <div class="flex justify-between items-center pb-2 border-b border-[#161B22]">
-                                    <span class="text-[#8c909f] font-medium">Total Demand</span> 
-                                    <span id="ev-pcu" class="font-mono text-white font-bold">-- PCU</span>
-                                </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-[#8c909f] font-medium">Timestamp</span> 
-                                    <span id="ev-timestamp" class="font-mono text-[#8c909f]">--</span>
-                                </div>
+                            <div class="flex justify-between items-center pb-2 border-b border-[#21262d]">
+                                <span class="text-[#8b949e]">Total Approach Demand</span> 
+                                <span id="ev-pcu" class="font-mono text-white font-bold">-- PCU</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-[#8b949e]">Last Telemetry Update</span> 
+                                <span id="ev-timestamp" class="font-mono text-[#8b949e] text-[10px]">--</span>
                             </div>
                         </div>
                     </div>
+
                 </div>
             </div>
 
-            <!-- Overlay: Control Room Network Insights -->
-            <div id="cr-insights-panel" class="absolute left-6 bottom-6 w-[320px] bg-[#161B22]/95 backdrop-blur-md border border-[#30363D] rounded-lg z-20 flex flex-col shadow-2xl transition-all duration-300">
-                <div class="p-3 border-b border-[#30363D] flex justify-between items-center cursor-pointer hover:bg-[#30363D]/30 transition-colors rounded-t-lg" id="btn-toggle-insights">
+            <!-- Overlay: Network Insights / Green Wave (Bottom Left) -->
+            <div id="cr-insights-panel" class="absolute left-6 bottom-6 w-[340px] bg-[#0d1117]/95 backdrop-blur-md border border-[#30363d] rounded-lg z-20 flex flex-col shadow-2xl transition-all duration-300">
+                <div class="p-3 border-b border-[#30363d] flex justify-between items-center cursor-pointer hover:bg-[#161b22] transition-colors rounded-t-lg" id="btn-toggle-insights">
                     <h3 class="text-[11px] font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-                        Network Insights
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                        Network Insights & Green Wave
                     </h3>
-                    <span id="cr-insights-icon" class="text-[#8c909f] text-[10px]">▼</span>
+                    <span id="cr-insights-icon" class="text-[#8b949e] text-[10px]">▼</span>
                 </div>
-                <div id="insights-content" class="p-4 flex flex-col gap-4">
-                    <div class="text-[10px] font-bold tracking-widest text-[#8c909f] uppercase mb-1">Green Wave Offsets</div>
-                    <div class="grid grid-cols-2 gap-3" id="green-wave-grid">
-                        <!-- JS populated -->
+                <div id="insights-content" class="p-3.5 flex flex-col gap-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase">Progression Offsets</span>
+                        <span class="text-[9px] font-mono text-[#10B981] font-semibold">CYCLE: 60s</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2" id="green-wave-grid">
+                        <!-- Populated by JS -->
                     </div>
                 </div>
             </div>
 
-            <!-- Overlay: User View Panel -->
-            <div id="panel-user-view" class="absolute left-6 top-6 bottom-6 w-[400px] bg-[#161B22]/95 backdrop-blur-md border border-[#30363D] rounded-lg z-40 shadow-2xl flex flex-col hidden overflow-hidden transition-all">
-                <div class="p-5 border-b border-[#30363D] bg-[#0B0E14]/50">
-                    <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+            <!-- Overlay: User View Panel (Driver Routing) -->
+            <div id="panel-user-view" class="absolute left-6 top-6 bottom-6 w-[410px] bg-[#0d1117]/95 backdrop-blur-md border border-[#30363d] rounded-lg z-40 shadow-2xl flex flex-col hidden overflow-hidden transition-all">
+                <div class="p-5 border-b border-[#30363d] bg-[#161b22]/70">
+                    <h2 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2.5"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
                         Where are you going?
                     </h2>
+                    <p class="text-xs text-[#8b949e] mt-0.5">AURA computes live cooperative routes across Kochi arterial corridors.</p>
                 </div>
                 
-                <div class="p-5 flex flex-col gap-4 shrink-0 bg-[#161B22]">
-                    <div class="flex flex-col gap-2 relative">
-                        <!-- Connecting line visual -->
-                        <div class="absolute left-6 top-8 bottom-8 w-0.5 border-l-2 border-dashed border-[#424754]"></div>
+                <div class="p-5 flex flex-col gap-4 shrink-0 bg-[#0d1117]">
+                    <div class="flex flex-col gap-3 relative">
                         
                         <!-- Origin Section -->
                         <div class="flex flex-col gap-2">
-                            <div class="text-[10px] font-bold text-[#8c909f] uppercase tracking-widest">From</div>
+                            <div class="text-[10px] font-bold text-[#8b949e] uppercase tracking-widest flex items-center justify-between">
+                                <span>Starting Point</span>
+                                <span class="text-[9px] text-[#60A5FA]">CLICK MAP OR GPS</span>
+                            </div>
                             <div class="flex gap-2">
-                                <button id="btn-use-location" class="flex-1 bg-[#0B0E14] border border-[#30363D] rounded-lg px-3 py-2 text-xs text-[#e1e2ec] hover:border-[#3B82F6] transition-colors flex items-center justify-center gap-2">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
-                                    Use My Current Location
+                                <button id="btn-use-location" class="flex-1 bg-[#161b22] border border-[#30363d] hover:border-[#3B82F6] rounded-md px-3 py-2 text-xs font-semibold text-[#e6edf3] transition-all flex items-center justify-center gap-1.5 shadow-sm">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
+                                    My Location
                                 </button>
-                                <button id="btn-map-origin" class="flex-1 bg-[#0B0E14] border border-[#30363D] rounded-lg px-3 py-2 text-xs text-[#e1e2ec] hover:border-[#3B82F6] transition-colors flex items-center justify-center gap-2">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
-                                    Choose Starting Location
+                                <button id="btn-map-origin" class="flex-1 bg-[#161b22] border border-[#30363d] hover:border-[#3B82F6] rounded-md px-3 py-2 text-xs font-semibold text-[#e6edf3] transition-all flex items-center justify-center gap-1.5 shadow-sm">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                                    Pick on Map
                                 </button>
                             </div>
                             <div id="origin-display" class="text-xs font-mono text-[#10B981] px-3 py-2 bg-[#10B981]/10 rounded border border-[#10B981]/30 hidden">
@@ -284,54 +327,55 @@
                         </div>
                         
                         <!-- Destination Section -->
-                        <div class="flex flex-col gap-1 mt-2">
-                            <div class="text-[10px] font-bold text-[#8c909f] uppercase tracking-widest">To</div>
-                            <select id="user-destination" class="w-full bg-[#0B0E14] border border-[#30363D] rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-[#3B82F6] shadow-inner transition-colors">
+                        <div class="flex flex-col gap-1.5">
+                            <div class="text-[10px] font-bold text-[#8b949e] uppercase tracking-widest">Destination</div>
+                            <select id="user-destination" class="w-full bg-[#161b22] border border-[#30363d] rounded-md px-3 py-2.5 text-xs font-medium text-white outline-none focus:border-[#3B82F6] shadow-inner transition-colors">
                             </select>
                         </div>
                     </div>
                     
-                    <button id="btn-user-route" class="mt-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white py-3 rounded-lg font-bold transition-colors shadow-lg flex items-center justify-center gap-2 text-sm tracking-wide">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg>
-                        FIND ROUTE
+                    <button id="btn-user-route" class="mt-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white py-2.5 rounded-md font-bold transition-all shadow-lg flex items-center justify-center gap-2 text-xs tracking-wider uppercase">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                        FIND BEST ROUTE
                     </button>
                 </div>
 
-                <div id="user-route-results" class="flex-1 overflow-y-auto p-5 pt-2 flex flex-col gap-5 custom-scrollbar bg-[#0B0E14]/30 hidden">
+                <!-- Route Results Section -->
+                <div id="user-route-results" class="flex-1 overflow-y-auto p-5 pt-2 flex flex-col gap-4 custom-scrollbar bg-[#161b22]/30 hidden">
                     
                     <!-- AURA Cooperative Route (Recommended) -->
-                    <div class="border border-[#10B981] bg-[#10B981]/10 rounded-lg p-4 flex flex-col gap-3 relative shadow-[0_0_20px_rgba(16,185,129,0.08)]">
+                    <div class="border border-[#10B981]/60 bg-[#10B981]/10 rounded-lg p-4 flex flex-col gap-2.5 relative shadow-[0_0_20px_rgba(16,185,129,0.08)]">
                         <div class="absolute top-0 left-0 bottom-0 w-1.5 bg-[#10B981] rounded-l-lg shadow-[0_0_8px_#10B981]"></div>
                         <div class="pl-2">
                             <div class="text-[10px] font-bold tracking-widest text-[#10B981] uppercase flex items-center gap-1.5 mb-1">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                                AURA Recommendation
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                AURA Recommended Route
                             </div>
                             <div class="flex items-baseline justify-between mb-2">
                                 <div class="text-2xl font-bold text-white tracking-tight" id="aura-time">-- min</div>
-                                <div class="text-[11px] font-mono font-bold text-[#10B981] bg-[#10B981]/20 px-2 py-0.5 rounded border border-[#10B981]/30" id="aura-diff">COOPERATIVE</div>
+                                <div class="text-[10px] font-mono font-bold text-[#10B981] bg-[#10B981]/20 px-2 py-0.5 rounded border border-[#10B981]/30" id="aura-diff">OPTIMAL FLOW</div>
                             </div>
-                            <div class="text-[11px] text-[#8c909f] font-mono font-medium flex flex-col gap-1 mb-3">
-                                <span class="text-[#e1e2ec] font-bold">JUNCTIONS ON YOUR ROUTE:</span>
-                                <span id="aura-path">--</span>
+                            <div class="text-[11px] text-[#8b949e] font-mono font-medium flex flex-col gap-1 mb-2.5">
+                                <span class="text-[#e6edf3] font-semibold text-[10px]">CORRIDOR JUNCTIONS:</span>
+                                <div id="aura-path" class="flex flex-wrap gap-1 text-xs">--</div>
                             </div>
                             
-                            <div class="p-3 bg-[#0B0E14] border border-[#30363D] rounded-md text-xs text-[#e1e2ec] leading-relaxed">
-                                <span class="text-[#10B981] font-semibold block mb-1">Why this route?</span>
-                                <span id="aura-explanation">--</span>
+                            <div class="p-2.5 bg-[#0d1117] border border-[#30363d] rounded text-xs text-[#e6edf3] leading-relaxed">
+                                <span class="text-[#10B981] font-semibold block mb-0.5 text-[11px]">Route Summary:</span>
+                                <span id="aura-explanation" class="text-xs text-[#8b949e]">--</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Individual Fastest Route -->
-                    <div class="border border-[#30363D] bg-[#161B22] rounded-lg p-4 flex flex-col gap-2">
-                        <div class="text-[10px] font-bold tracking-widest text-[#8c909f] uppercase mb-1">Individual Fastest</div>
+                    <!-- Individual Direct Route -->
+                    <div class="border border-[#30363d] bg-[#161b22] rounded-lg p-4 flex flex-col gap-2">
+                        <div class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase mb-0.5">Individual Shortest Path</div>
                         <div class="flex justify-between items-baseline">
-                            <div class="text-xl font-bold text-white" id="fast-time">-- min</div>
-                            <div class="text-[10px] font-mono font-bold text-[#F59E0B] bg-[#F59E0B]/20 px-2 py-0.5 rounded border border-[#F59E0B]/30" id="fast-diff">--</div>
+                            <div class="text-lg font-bold text-white" id="fast-time">-- min</div>
+                            <div class="text-[10px] font-mono font-bold text-[#F59E0B] bg-[#F59E0B]/20 px-2 py-0.5 rounded border border-[#F59E0B]/30" id="fast-diff">DIRECT</div>
                         </div>
-                        <div class="text-[11px] text-[#8c909f] font-mono mt-1" id="fast-path">--</div>
-                        <div class="text-[11px] text-[#8c909f] mt-2 leading-relaxed" id="fast-explanation">--</div>
+                        <div class="text-[10px] text-[#8b949e] font-mono mt-1" id="fast-path">--</div>
+                        <div class="text-xs text-[#8b949e] mt-1 leading-relaxed" id="fast-explanation">--</div>
                     </div>
                     
                 </div>
@@ -340,6 +384,7 @@
         </div>
     </main>
 
+    <!-- Leaflet JS & App Logic -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="app.js"></script>
 </body>
