@@ -1,43 +1,74 @@
 const seedrandom = require('seedrandom');
 
 class SimulationSensor {
-  constructor(seed = "AURA_DEMO_SEED") {
-    this.rng = seedrandom(seed);
-    this.currentDemand = {};
-  }
-
-  tick(junctionIds, approaches) {
-    const r = this.rng(); // Advance RNG exactly once per tick
-    for (const j of junctionIds) {
-      if (!this.currentDemand[j]) this.currentDemand[j] = {};
-      for (const a of approaches) {
-        // Deterministic pseudo-random based on the single tick RNG value, junction and approach
-        const pseudoRandom = Math.abs(Math.sin(r * 1000000 + j.charCodeAt(0) + a.charCodeAt(0))) % 1;
-        const hasVehicle = pseudoRandom < 0.3; // 30% chance per second
-        let counts = { two_wheeler: 0, auto_rickshaw: 0, car: 0, bus: 0 };
-        if (hasVehicle) {
-          const typeRand = Math.abs(Math.cos(pseudoRandom * 1000000)) % 1;
-          if (typeRand < 0.5) counts.two_wheeler = 1;
-          else if (typeRand < 0.7) counts.auto_rickshaw = 1;
-          else if (typeRand < 0.9) counts.car = 1;
-          else counts.bus = 1;
-        }
-        this.currentDemand[j][a] = {
-          junctionId: j,
-          approach: a,
-          counts: counts,
-          sourceMode: "SIMULATED"
-        };
-      }
+    constructor(seed = "AURA_DEMO_SEED") {
+        this.rng = seedrandom(seed);
+        this.state = {};
     }
-  }
 
-  getApproachState(junctionId, approach) {
-    if (!this.currentDemand[junctionId] || !this.currentDemand[junctionId][approach]) {
-       return { junctionId, approach, counts: { two_wheeler: 0, auto_rickshaw: 0, car: 0, bus: 0 }, sourceMode: "SIMULATED" };
+    tick(junctionIds, approaches) {
+        junctionIds.forEach(jid => {
+            if (!this.state[jid]) this.state[jid] = {};
+            approaches.forEach(appr => {
+                const isCar = this.rng() > 0.5;
+                const isTwoWheeler = this.rng() > 0.7;
+                
+                let counts = { two_wheeler: 0, auto_rickshaw: 0, car: 0, bus: 0 };
+                if (isCar) counts.car = 1;
+                if (isTwoWheeler) counts.two_wheeler = 2;
+                
+                this.state[jid][appr] = {
+                    counts: counts,
+                    sourceMode: "SIMULATED"
+                };
+            });
+        });
     }
-    return this.currentDemand[junctionId][approach];
-  }
+
+    getApproachState(junctionId, approach) {
+        return this.state[junctionId][approach];
+    }
 }
 
-module.exports = { SimulationSensor };
+class HybridSensor {
+    constructor(fallbackSensor, timeoutMs = 5000) {
+        this.fallbackSensor = fallbackSensor;
+        this.timeoutMs = timeoutMs;
+        this.visionState = {};
+        this.lastSeen = {};
+    }
+
+    injectVisionData(junctionId, approach, data, mode = "REPLAY") {
+        if (!this.visionState[junctionId]) this.visionState[junctionId] = {};
+        if (!this.lastSeen[junctionId]) this.lastSeen[junctionId] = {};
+
+        this.visionState[junctionId][approach] = {
+            counts: data.counts,
+            sourceMode: mode
+        };
+        this.lastSeen[junctionId][approach] = Date.now();
+    }
+
+    tick(junctionIds, approaches) {
+        this.fallbackSensor.tick(junctionIds, approaches);
+    }
+
+    getApproachState(junctionId, approach) {
+        const now = Date.now();
+        if (this.visionState[junctionId] && this.visionState[junctionId][approach]) {
+            const lastTime = this.lastSeen[junctionId][approach] || 0;
+            if (now - lastTime < this.timeoutMs) {
+                const state = this.visionState[junctionId][approach];
+                // Consume the new arrivals, then clear them so they aren't double counted if no new injection occurs
+                this.visionState[junctionId][approach] = { counts: {}, sourceMode: state.sourceMode };
+                return state;
+            }
+        }
+        // Fallback
+        const state = this.fallbackSensor.getApproachState(junctionId, approach);
+        // Ensure sourceMode reflects fallback
+        return { ...state, sourceMode: "SIMULATED" };
+    }
+}
+
+module.exports = { SimulationSensor, HybridSensor };

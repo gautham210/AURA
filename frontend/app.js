@@ -38,6 +38,25 @@ ws.onmessage = (event) => {
     if (msg.event === "SIMULATED_TRAFFIC_STATE") {
         const list = document.getElementById('junctions-list');
         list.innerHTML = '';
+        
+        // Show Green Wave Info
+        const gwContainer = document.createElement('div');
+        gwContainer.style.background = '#222';
+        gwContainer.style.padding = '10px';
+        gwContainer.style.marginBottom = '15px';
+        let gwHtml = `<h3>Green Wave Offsets (10 m/s)</h3><div style="display:flex; gap:10px;">`;
+        if (msg.data.green_wave) {
+            for (const [jid, data] of Object.entries(msg.data.green_wave)) {
+                gwHtml += `<div style="background:#333; padding:5px; border-radius:4px; text-align:center;">
+                    <b>${jid}</b><br>
+                    <span style="color:#aaa">${data.offset}s</span><br>
+                    <span style="color:${data.state === 'GREEN' ? '#4CAF50' : '#f44336'}">${data.state}</span>
+                </div>`;
+            }
+        }
+        gwHtml += `</div>`;
+        gwContainer.innerHTML = gwHtml;
+        list.appendChild(gwContainer);
 
         msg.data.junctions.forEach(j => {
             const card = document.createElement('div');
@@ -52,8 +71,15 @@ ws.onmessage = (event) => {
                     auraDelay += state.avg_delay_seconds;
                     auraCount++;
                 }
+                
+                let sourceBadge = '';
+                if (state.source_mode === 'LIVE') sourceBadge = `<span style="color: #4CAF50; font-size: 0.7rem; border: 1px solid #4CAF50; padding: 1px 3px; border-radius: 3px;">LIVE</span>`;
+                else if (state.source_mode === 'REPLAY') sourceBadge = `<span style="color: #FFEB3B; font-size: 0.7rem; border: 1px solid #FFEB3B; padding: 1px 3px; border-radius: 3px;">REPLAY</span>`;
+                else sourceBadge = `<span style="color: #9E9E9E; font-size: 0.7rem; border: 1px solid #9E9E9E; padding: 1px 3px; border-radius: 3px;">SIMULATED</span>`;
+
                 auraApps += `<div class="approach-item">
-                    <strong>${appr}</strong>: <span style="color:${state.signal_state === 'GREEN' ? '#4CAF50' : '#f44336'}">${state.signal_state}</span> | Q: ${state.queue_pcu} PCU
+                    <strong>${appr}</strong> ${sourceBadge}<br>
+                    State: <span style="color:${state.signal_state === 'GREEN' ? '#4CAF50' : '#f44336'}">${state.signal_state}</span> | Q: ${state.queue_pcu} PCU
                 </div>`;
             }
             auraDelay = auraCount > 0 ? (auraDelay / auraCount).toFixed(1) : 0;
@@ -68,7 +94,8 @@ ws.onmessage = (event) => {
                     baseCount++;
                 }
                 baseApps += `<div class="approach-item">
-                    <strong>${appr}</strong>: <span style="color:${state.signal_state === 'GREEN' ? '#4CAF50' : '#f44336'}">${state.signal_state}</span> | Q: ${state.queue_pcu} PCU
+                    <strong>${appr}</strong><br>
+                    State: <span style="color:${state.signal_state === 'GREEN' ? '#4CAF50' : '#f44336'}">${state.signal_state}</span> | Q: ${state.queue_pcu} PCU
                 </div>`;
             }
             baseDelay = baseCount > 0 ? (baseDelay / baseCount).toFixed(1) : 0;

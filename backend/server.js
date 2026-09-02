@@ -4,11 +4,12 @@ const WebSocket = require('ws');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
-const { SimulationSensor } = require('./trafficSensors');
+const { SimulationSensor, HybridSensor } = require('./trafficSensors');
 const { TrafficEngine, BaselineController } = require('./trafficEngine');
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend')));
 
 const server = http.createServer(app);
@@ -17,7 +18,9 @@ const wss = new WebSocket.Server({ server });
 const graphPath = path.join(__dirname, 'graph.json');
 const graph = JSON.parse(fs.readFileSync(graphPath, 'utf8'));
 
-const sensor = new SimulationSensor("AURA_DEMO_SEED");
+const simSensor = new SimulationSensor("AURA_DEMO_SEED");
+// 2 second timeout for vision
+const sensor = new HybridSensor(simSensor, 2000); 
 
 const junctionIds = graph.junctions.map(j => j.id);
 const approaches = ["NORTHBOUND", "SOUTHBOUND", "EASTBOUND", "WESTBOUND"];
@@ -32,7 +35,42 @@ junctionIds.forEach(jid => {
     baseline.initJunction(jid, phases);
 });
 
+// Vision endpoint
+app.post('/vision-update', (req, res) => {
+    const { junction_id, approach_direction, detections, calculated_pcu, source_mode } = req.body.data;
+    
+    // Convert new arrivals into "counts" format that calculatePCU expects, or just inject direct PCU?
+    // The sensor interface expects 'counts'.
+    // If tracking gives us new arrivals, we can inject those directly.
+    sensor.injectVisionData(junction_id, approach_direction, { counts: detections }, source_mode || "LIVE");
+    
+    res.json({ status: 'ok' });
+});
+
 let connectedClients = new Set();
+
+const CYCLE_LENGTH = 60;
+const PROGRESSION_SPEED = 10; // m/s
+let cumulativeDistance = 0;
+const greenWaveOffsets = {};
+
+graph.junctions.forEach(j => {
+    greenWaveOffsets[j.id] = Math.round(cumulativeDistance / PROGRESSION_SPEED) % CYCLE_LENGTH;
+    cumulativeDistance += j.distanceToNext || 0;
+});
+
+function getGreenWaveStates() {
+    const cycleClock = Math.floor(Date.now() / 1000) % CYCLE_LENGTH;
+    let states = {};
+    graph.junctions.forEach(j => {
+        const localTime = (cycleClock - greenWaveOffsets[j.id] + CYCLE_LENGTH) % CYCLE_LENGTH;
+        states[j.id] = {
+            offset: greenWaveOffsets[j.id],
+            state: localTime < 30 ? "GREEN" : "RED"
+        };
+    });
+    return states;
+}
 
 wss.on('connection', (ws) => {
     console.log("Client connected");
@@ -98,7 +136,10 @@ setInterval(() => {
     const payload = {
         event: "SIMULATED_TRAFFIC_STATE",
         timestamp: new Date().toISOString(),
-        data: { junctions: junctionsState }
+        data: { 
+            junctions: junctionsState,
+            green_wave: getGreenWaveStates()
+        }
     };
 
     const message = JSON.stringify(payload);
