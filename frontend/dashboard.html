@@ -1,296 +1,326 @@
 <!DOCTYPE html>
-
-<html class="dark" lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>AURA Control Room</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    "colors": {
-                        "inverse-primary": "#005ac2",
-                        "surface-variant": "#32353c",
-                        "primary-container": "#4d8eff",
-                        "secondary-container": "#00a572",
-                        "on-tertiary-fixed-variant": "#723600",
-                        "on-tertiary-fixed": "#311400",
-                        "surface": "#10131a",
-                        "surface-container-high": "#272a31",
-                        "secondary-fixed": "#6ffbbe",
-                        "on-tertiary": "#502400",
-                        "inverse-on-surface": "#2e3038",
-                        "surface-container-highest": "#32353c",
-                        "secondary-fixed-dim": "#4edea3",
-                        "error-container": "#93000a",
-                        "on-error": "#690005",
-                        "on-secondary-fixed": "#002113",
-                        "surface-container-low": "#191b23",
-                        "on-primary-container": "#00285d",
-                        "background": "#10131a",
-                        "secondary": "#4edea3",
-                        "on-primary-fixed": "#001a42",
-                        "primary-fixed": "#d8e2ff",
-                        "primary-fixed-dim": "#adc6ff",
-                        "on-error-container": "#ffdad6",
-                        "inverse-surface": "#e1e2ec",
-                        "primary": "#adc6ff",
-                        "outline-variant": "#424754",
-                        "on-surface": "#e1e2ec",
-                        "surface-bright": "#363941",
-                        "surface-container-lowest": "#0b0e15",
-                        "on-primary-fixed-variant": "#004395",
-                        "on-primary": "#002e6a",
-                        "surface-dim": "#10131a",
-                        "tertiary": "#ffb786",
-                        "on-surface-variant": "#c2c6d6",
-                        "surface-tint": "#adc6ff",
-                        "outline": "#8c909f",
-                        "error": "#ffb4ab",
-                        "tertiary-fixed-dim": "#ffb786",
-                        "on-secondary-container": "#00311f",
-                        "on-secondary": "#003824",
-                        "surface-container": "#1d2027",
-                        "on-tertiary-container": "#461f00",
-                        "on-secondary-fixed-variant": "#005236",
-                        "on-background": "#e1e2ec",
-                        "tertiary-container": "#df7412",
-                        "tertiary-fixed": "#ffdcc6"
-                    },
-                    "borderRadius": {
-                        "DEFAULT": "0.125rem",
-                        "lg": "0.25rem",
-                        "xl": "0.5rem",
-                        "full": "0.75rem"
-                    },
-                    "spacing": {
-                        "gutter": "1rem",
-                        "unit": "4px",
-                        "component-gap": "0.5rem",
-                        "sidebar-width": "280px",
-                        "container-padding": "1.5rem"
-                    },
-                    "fontFamily": {
-                        "data-mono": ["JetBrains Mono"],
-                        "label-caps": ["Inter"],
-                        "headline-md": ["Inter"],
-                        "body-sm": ["Inter"],
-                        "body-md": ["Inter"],
-                        "display-lg": ["Inter"]
-                    },
-                    "fontSize": {
-                        "data-mono": ["13px", { "lineHeight": "16px", "fontWeight": "500" }],
-                        "label-caps": ["10px", { "lineHeight": "12px", "letterSpacing": "0.05em", "fontWeight": "700" }],
-                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
-                        "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
-                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
-                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }]
-                    }
-                }
-            }
-        }
-    </script>
-<style>
-        .pulsing-border { animation: pulseBorder 2s infinite; }
-        @keyframes pulseBorder { 0% { border-color: #4edea3; box-shadow: 0 0 0 0 rgba(78, 222, 163, 0.4); } 70% { border-color: transparent; box-shadow: 0 0 0 4px rgba(78, 222, 163, 0); } 100% { border-color: #4edea3; box-shadow: 0 0 0 0 rgba(78, 222, 163, 0); } }
-        .junction-tooltip {
-            background: rgba(16, 19, 26, 0.9);
-            border: 1px solid #424754;
-            color: #e1e2ec;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
-            font-weight: 500;
-            padding: 2px 6px;
-            border-radius: 3px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-        }
-        .junction-tooltip::before { border-top-color: rgba(16, 19, 26, 0.9) !important; }
-    </style>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AURA Control Room</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Custom scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #424754; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #8c909f; }
+        
+        /* Leaflet overrides */
+        .leaflet-container { background: #0b0e15 !important; }
+        .junction-tooltip {
+            background: rgba(22, 27, 34, 0.95) !important;
+            border: 1px solid #30363D !important;
+            color: #e1e2ec !important;
+            font-family: 'JetBrains Mono', monospace !important;
+            font-size: 11px !important;
+            font-weight: 500 !important;
+            padding: 4px 8px !important;
+            border-radius: 4px !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+            white-space: nowrap;
+        }
+        .junction-tooltip::before { border-top-color: rgba(22, 27, 34, 0.95) !important; }
+        
+        /* Signal glow animations */
+        @keyframes pulse-red { 0% { box-shadow: 0 0 8px 2px rgba(239,68,68,0.4); } 50% { box-shadow: 0 0 12px 4px rgba(239,68,68,0.6); } 100% { box-shadow: 0 0 8px 2px rgba(239,68,68,0.4); } }
+        @keyframes pulse-green { 0% { box-shadow: 0 0 8px 2px rgba(16,185,129,0.4); } 50% { box-shadow: 0 0 12px 4px rgba(16,185,129,0.6); } 100% { box-shadow: 0 0 8px 2px rgba(16,185,129,0.4); } }
+        
+        .signal-red { background-color: #EF4444; animation: pulse-red 2s infinite; }
+        .signal-green { background-color: #10B981; animation: pulse-green 2s infinite; }
+        
+        /* Route dash animation */
+        @keyframes dash-anim { to { stroke-dashoffset: -20; } }
+        .route-dash { stroke-dasharray: 6 6; animation: dash-anim 1s linear infinite; }
+    </style>
 </head>
-<body class="bg-background text-on-surface h-screen overflow-hidden flex flex-col font-body-sm text-body-sm">
-<!-- TopNavBar -->
-<header class="bg-surface border-b border-outline-variant flex justify-between items-center w-full px-gutter h-12 z-50 shrink-0">
-<div class="flex items-center gap-6">
-<div class="text-headline-md font-headline-md font-bold tracking-tighter text-primary">AURA</div>
-<div class="flex gap-4 items-center border-l border-outline-variant pl-4">
-<div class="flex flex-col">
-<span class="text-label-caps font-label-caps text-on-surface-variant">NETWORK</span>
-<span class="text-data-mono font-data-mono text-on-surface">Kochi Demo Corridor</span>
-</div>
-<div class="flex flex-col">
-<span class="text-label-caps font-label-caps text-on-surface-variant">SYSTEM</span>
-<div class="flex items-center gap-1">
-<div class="w-2 h-2 rounded-full bg-secondary"></div>
-<span class="text-data-mono font-data-mono text-on-surface">Online</span>
-</div>
-</div>
-</div>
-</div>
-<div class="flex items-center gap-6">
-<div class="flex items-center gap-4 border-r border-outline-variant pr-4">
-<div class="flex flex-col items-end">
-<span class="text-label-caps font-label-caps text-on-surface-variant">DATA</span>
-<span id="data-source" class="text-data-mono font-data-mono text-on-surface-variant">SIMULATED</span>
-</div>
-<div class="flex flex-col items-end">
-<span class="text-label-caps font-label-caps text-on-surface-variant">CONNECTION</span>
-<div class="flex items-center gap-1">
-<span class="material-symbols-outlined text-[14px] text-secondary" id="status-icon" style="font-variation-settings: 'FILL' 1;">wifi</span>
-<span id="status" class="text-data-mono font-data-mono text-on-surface">Connecting...</span>
-</div>
-</div>
-</div>
-<nav class="flex gap-4">
-<button class="text-primary border-b-2 border-primary pb-1 font-bold text-label-caps font-label-caps uppercase transition-colors hover:bg-surface-container-high px-2">Control Room</button>
-<button class="text-on-surface-variant font-medium text-label-caps font-label-caps uppercase transition-colors hover:bg-surface-container-high px-2 pb-1">User View</button>
-</nav>
-<div class="flex items-center gap-2">
-<button class="h-8 px-3 border border-outline-variant rounded flex items-center justify-center text-label-caps font-label-caps text-on-surface hover:bg-surface-container-high transition-colors">Emergency</button>
-<button class="h-8 px-3 bg-inverse-primary text-on-primary rounded flex items-center justify-center text-label-caps font-label-caps hover:bg-primary-container transition-colors">Aura/Baseline Toggle</button>
-</div>
-<div class="flex items-center gap-2">
-<button class="w-8 h-8 rounded flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors">
-<span class="material-symbols-outlined" data-icon="sensors">sensors</span>
-</button>
-<button class="w-8 h-8 rounded flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors">
-<span class="material-symbols-outlined" data-icon="settings">settings</span>
-</button>
-<button class="w-8 h-8 rounded flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors">
-<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
-</button>
-</div>
-</div>
-</header>
-<div class="flex flex-1 overflow-hidden">
-<!-- SideNavBar -->
-<aside class="bg-surface-container-low border-r border-outline-variant flex flex-col w-[280px] shrink-0 z-40 hidden md:flex">
-<div class="p-4 border-b border-outline-variant flex gap-3 items-center">
-<img alt="System Status Indicator" class="w-10 h-10 rounded-full object-cover border border-outline-variant" data-alt="A highly detailed circular status indicator showing a complex geometric pattern radiating outward in vivid green against a dark background, representing an active system state. The style is modern, technical, and precise, emitting a subtle digital glow. High contrast, sharp edges." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWAnSWuBTlGXWbSZTcOrjU2pSSSm9AIh4QFvj1G8gScHRBs8sQhC5WG8JuN-L98MwteTcObe40tuyD8RoePlKP2c43mmyYgszNPeHB-uG_ZVHuORV4hCHgYpcPzWFyyE3wnwT7RE_rvIy9Sukrr2LDoR1kd48VtF741E9o8MwPqlkw_cFgN2kvIY-OXDuPcwXCYlOrPcEGCJK42p_nkLe1xEkhMgrZ591kiDwpyJ3yts0oJ_1TUfnM"/>
-<div>
-<h2 id="sidebar-system-status" class="text-body-md font-body-md font-bold text-on-surface">System Online</h2>
-<p id="sidebar-data-label" class="text-label-caps font-label-caps text-on-surface-variant">Simulated Data</p>
-</div>
-</div>
-<div id="junctions-list" class="flex-1 py-4 flex flex-col gap-2 overflow-y-auto px-2"></div>
-<div class="p-4 border-t border-outline-variant mt-auto">
-<button class="w-full bg-inverse-primary text-on-primary h-8 rounded flex justify-center items-center text-label-caps font-label-caps hover:bg-primary-container transition-colors mb-4">Start Simulation</button>
-<div class="flex flex-col gap-1">
-<a class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest rounded-lg px-3 py-2 flex items-center gap-3 transition-colors" href="#">
-<span class="material-symbols-outlined text-[18px]">settings</span>
-<span class="text-label-caps font-label-caps">Settings</span>
-</a>
-<a class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest rounded-lg px-3 py-2 flex items-center gap-3 transition-colors" href="#">
-<span class="material-symbols-outlined text-[18px]">help</span>
-<span class="text-label-caps font-label-caps">Support</span>
-</a>
-</div>
-</div>
-</aside>
-<!-- Main Workspace -->
-<main class="flex-1 flex flex-col bg-surface-container-lowest overflow-hidden">
-<!-- Metrics Bar -->
-<div class="bg-surface border-b border-outline-variant h-14 flex items-center px-4 gap-2 shrink-0">
-<div class="flex-1 border border-outline-variant bg-surface-container-low rounded p-2 flex items-center justify-between">
-<span class="text-label-caps font-label-caps text-on-surface-variant flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">router</span> Network Status</span>
-<div class="flex items-center gap-1"><div class="w-1.5 h-1.5 rounded-full bg-secondary"></div><span class="text-data-mono font-data-mono text-secondary">Active</span></div>
-</div>
-<div class="flex-1 border border-outline-variant bg-surface-container-low rounded p-2 flex items-center justify-between">
-<span class="text-label-caps font-label-caps text-on-surface-variant flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">timer</span> Avg Delay</span>
-<span id="metric-delay" class="text-data-mono font-data-mono text-on-surface">--s</span>
-</div>
-<div class="flex-1 border border-outline-variant bg-surface-container-low rounded p-2 flex items-center justify-between">
-<span class="text-label-caps font-label-caps text-on-surface-variant flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">queue</span> Max Demand</span>
-<span id="metric-demand" class="text-data-mono font-data-mono text-tertiary">-- PCU</span>
-</div>
-<div class="flex-1 border border-outline-variant bg-surface-container-low rounded p-2 flex items-center justify-between">
-<span class="text-label-caps font-label-caps text-on-surface-variant flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">warning</span> Spillbacks</span>
-<span id="metric-spillbacks" class="text-data-mono font-data-mono text-error">--</span>
-</div>
-<div class="flex-1 border border-outline-variant bg-surface-container-low rounded p-2 flex items-center justify-between">
-<span class="text-label-caps font-label-caps text-on-surface-variant flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">low_priority</span> Priority</span>
-<span class="text-data-mono font-data-mono text-primary">Normal</span>
-</div>
-</div>
-<!-- Content Area (Map + Panel) -->
-<div class="flex flex-1 overflow-hidden relative">
-<!-- Map Area -->
-<div class="flex-1 relative bg-surface-container-lowest overflow-hidden border-r border-outline-variant" data-location="Kochi">
-<div id="map" class="w-full h-full z-10 absolute inset-0"></div>
-</div>
-<!-- Right Drawer -->
-<div class="w-[340px] bg-surface flex flex-col shrink-0 overflow-y-auto z-20">
-    <div class="p-4 border-b border-outline-variant flex flex-col bg-surface-container-low">
-        <h3 class="text-body-md font-body-md font-bold text-on-surface mb-4">Routing Engine</h3>
-        <div class="flex flex-col gap-2">
-            <label class="text-label-caps text-on-surface-variant">Origin: 
-                <select id="route-origin" class="w-full bg-surface-container-highest border border-outline-variant rounded p-1 text-on-surface mt-1">
-                    <option value="J1">J1 Edappally</option>
-                    <option value="J2">J2 Palarivattom</option>
-                    <option value="J3">J3 Vyttila</option>
-                    <option value="J4">J4 Kundanoor</option>
-                    <option value="J5">J5 Kakkanad</option>
-                    <option value="J6">J6 Tripunithura</option>
-                </select>
-            </label>
-            <label class="text-label-caps text-on-surface-variant">Dest: 
-                <select id="route-dest" class="w-full bg-surface-container-highest border border-outline-variant rounded p-1 text-on-surface mt-1">
-                    <option value="J3" selected>J3 Vyttila</option>
-                    <option value="J4">J4 Kundanoor</option>
-                    <option value="J1">J1 Edappally</option>
-                </select>
-            </label>
-            <button onclick="requestRoute()" class="mt-2 bg-inverse-primary text-on-primary rounded py-1.5 text-label-caps hover:bg-primary-container transition-colors">Find Route</button>
+<body class="bg-[#0b0e15] text-[#e1e2ec] h-screen w-screen overflow-hidden flex flex-col antialiased selection:bg-[#3B82F6] selection:text-white">
+
+    <!-- Header -->
+    <nav class="h-14 border-b border-[#30363D] bg-[#161B22] flex items-center justify-between px-6 shrink-0 z-50 relative">
+        <div class="flex items-center gap-8">
+            <div class="text-xl font-bold text-[#3B82F6] tracking-tight">AURA Kochi Network</div>
+            <div class="flex gap-6 mt-1">
+                <button id="tab-control-room" class="text-sm font-semibold border-b-2 border-[#3B82F6] pb-1.5 text-[#3B82F6] transition-colors">Control Room</button>
+                <button id="tab-user-view" class="text-sm font-semibold border-b-2 border-transparent pb-1.5 text-[#8c909f] hover:text-[#e1e2ec] transition-colors">User View</button>
+            </div>
         </div>
-    </div>
-    <div id="route-results" class="p-4 flex flex-col gap-4 overflow-y-auto"></div>
-</div>
-<!-- Bottom Section (Timeline & Controls) -->
+        <div class="flex gap-5 items-center">
+            <!-- Global Controls -->
+            <div class="flex gap-2 bg-[#0B0E14] p-1 rounded border border-[#30363D]">
+                <button id="btn-start" class="px-3 py-1 bg-[#10B981] hover:bg-[#059669] text-white text-[10px] tracking-wider rounded font-bold cursor-pointer transition-colors" title="Start Simulation">START</button>
+                <button id="btn-pause" class="px-3 py-1 bg-transparent text-[#8c909f] text-[10px] tracking-wider rounded font-bold cursor-not-allowed opacity-50" title="Pause functionality not available in backend">PAUSE</button>
+                <button id="btn-reset" class="px-3 py-1 bg-transparent text-[#8c909f] text-[10px] tracking-wider rounded font-bold cursor-not-allowed opacity-50" title="Reset functionality not available in backend">RESET</button>
+            </div>
+            
+            <div class="flex gap-2 bg-[#0B0E14] p-1 rounded border border-[#30363D]">
+                <button id="btn-toggle-aura" class="px-3 py-1 bg-[#3B82F6] text-white text-[10px] tracking-wider rounded font-bold cursor-pointer hover:bg-[#2563EB] transition-colors">AURA ON</button>
+                <button id="btn-compare" class="px-3 py-1 bg-transparent text-[#8c909f] text-[10px] tracking-wider rounded font-bold cursor-not-allowed opacity-50" title="Side-by-side comparison pending UI implementation">COMPARE</button>
+            </div>
 
-<div class="h-48 border-t border-outline-variant bg-surface flex shrink-0">
-<!-- Event Timeline -->
+            <div class="w-px h-6 bg-[#30363D] mx-1"></div>
 
-<div class="flex-1 flex flex-col border-r border-outline-variant">
-    <div class="bg-surface-container-low px-4 py-2 border-b border-outline-variant flex items-center justify-between shrink-0">
-        <span class="text-label-caps font-label-caps text-on-surface-variant">GREEN WAVE OFFSETS</span>
-    </div>
-    <div id="green-wave-panel" class="flex-1 overflow-y-auto p-2 flex gap-4 p-4">
-        <!-- Populated by app.js -->
-    </div>
-</div>
-<!-- Control Panel -->
+            <div class="flex flex-col items-end gap-0.5">
+                <div id="data-source" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#32353c] text-[#8c909f] border border-[#424754]">DATA: SIMULATED</div>
+                <div id="connection-status" class="text-[9px] font-mono font-bold text-[#F59E0B] px-1">● CONNECTING...</div>
+            </div>
+        </div>
+    </nav>
 
-<div class="w-[340px] flex flex-col bg-surface-container-lowest shrink-0">
-<div class="bg-surface-container-low px-4 py-2 border-b border-outline-variant shrink-0">
-<span class="text-label-caps font-label-caps text-on-surface-variant">GLOBAL CONTROLS</span>
-</div>
-<div class="p-4 flex flex-col gap-3 flex-1 overflow-y-auto">
-<div class="flex gap-2">
-<button class="flex-1 h-8 bg-surface-container-high border border-outline-variant hover:border-secondary hover:text-secondary text-on-surface rounded flex items-center justify-center gap-1 transition-colors text-label-caps font-label-caps">
-<span class="material-symbols-outlined text-[16px]">play_arrow</span> Start
-                            </button>
-<button class="flex-1 h-8 bg-surface-container-high border border-outline-variant hover:border-error hover:text-error text-on-surface rounded flex items-center justify-center gap-1 transition-colors text-label-caps font-label-caps">
-<span class="material-symbols-outlined text-[16px]">pause</span> Pause
-                            </button>
-<button class="h-8 w-8 bg-surface-container-high border border-outline-variant hover:bg-surface-bright text-on-surface rounded flex items-center justify-center transition-colors">
-<span class="material-symbols-outlined text-[16px]">restart_alt</span>
-</button>
-</div>
-<div class="grid grid-cols-2 gap-2">
-<button class="h-8 border border-outline-variant rounded flex items-center justify-center text-label-caps font-label-caps text-on-surface hover:bg-surface-container-high transition-colors">Compare Stats</button>
-<button class="h-8 border border-outline-variant rounded flex items-center justify-center text-label-caps font-label-caps text-on-surface hover:bg-surface-container-high transition-colors">Routing Setup</button>
-<button class="h-8 border border-error text-error rounded flex items-center justify-center text-label-caps font-label-caps hover:bg-error-container hover:text-on-error transition-colors col-span-2">Emergency Override</button>
-</div>
-</div>
-</div>
-</div>
-</main>
-</div>
+    <!-- Main Container -->
+    <main class="flex-1 relative flex flex-col overflow-hidden">
+        
+        <!-- Control Room Top Metrics -->
+        <div id="top-metrics" class="h-[46px] border-b border-[#30363D] bg-[#161B22]/90 flex items-center px-6 gap-10 z-40 relative backdrop-blur-sm">
+            <div class="flex items-center gap-3">
+                <span class="text-[#8c909f] text-[10px] font-bold tracking-widest uppercase">Avg Control Delay</span>
+                <span id="metric-delay" class="font-mono text-sm font-semibold text-white">--</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-[#8c909f] text-[10px] font-bold tracking-widest uppercase">Max Demand (PCU)</span>
+                <span id="metric-demand" class="font-mono text-sm font-semibold text-[#F59E0B]">--</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-[#8c909f] text-[10px] font-bold tracking-widest uppercase">Spillback Events</span>
+                <span id="metric-spillbacks" class="font-mono text-sm font-semibold text-[#EF4444]">--</span>
+            </div>
+            <div class="flex-1"></div>
+            <div class="flex items-center gap-3 bg-[#0B0E14] px-3 py-1 rounded border border-[#30363D]">
+                <span class="text-[#8c909f] text-[10px] font-bold tracking-widest uppercase">Mode</span>
+                <span id="metric-mode" class="font-mono text-xs font-bold text-[#3B82F6]">AURA COOPERATIVE</span>
+            </div>
+        </div>
+
+        <!-- Workspace Layer -->
+        <div class="flex-1 relative flex">
+            <!-- Leaflet Map Container -->
+            <div id="map" class="absolute inset-0 z-0 bg-[#0B0E14]"></div>
+            
+            <!-- Vignette -->
+            <div class="absolute inset-0 pointer-events-none z-10 shadow-[inset_0_0_120px_rgba(11,14,20,0.9)]"></div>
+
+            <!-- Overlay: Control Room Detail Drawer -->
+            <div id="drawer-control" class="absolute right-0 top-0 bottom-0 w-[420px] bg-[#161B22]/95 backdrop-blur-md border-l border-[#30363D] z-30 transform translate-x-full transition-transform duration-300 flex flex-col shadow-2xl">
+                <!-- Drawer Header -->
+                <div class="p-5 border-b border-[#30363D] flex justify-between items-start shrink-0 bg-[#0B0E14]/50">
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span id="drawer-jid" class="px-1.5 py-0.5 bg-[#30363D] text-[#e1e2ec] text-[10px] font-mono font-bold rounded">--</span>
+                            <h2 id="drawer-title" class="text-lg font-bold text-white">Select Junction</h2>
+                        </div>
+                        <div class="text-xs text-[#8c909f] font-mono mt-1 flex items-center gap-2">
+                            CURRENT PHASE: <span id="drawer-phase" class="px-2 py-0.5 bg-[#3B82F6]/20 text-[#3B82F6] font-bold rounded border border-[#3B82F6]/30">--</span>
+                        </div>
+                    </div>
+                    <button id="btn-close-drawer" class="text-[#8c909f] hover:text-white p-1 rounded hover:bg-[#30363D] transition-colors">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <!-- Drawer Content -->
+                <div id="drawer-content" class="flex-1 overflow-y-auto p-5 flex flex-col gap-8 custom-scrollbar">
+                    
+                    <!-- LEVEL 1: Four-Way Signal Visual -->
+                    <div class="flex flex-col gap-3">
+                        <h3 class="text-[10px] font-bold tracking-widest text-[#8c909f] uppercase flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-[#3B82F6]"></span> Intersection State
+                        </h3>
+                        <div class="bg-[#0B0E14] border border-[#30363D] rounded-lg p-4 relative h-56 flex items-center justify-center shadow-inner">
+                            <!-- Intersection lines -->
+                            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div class="w-full h-12 border-y-2 border-dashed border-[#30363D]"></div>
+                                <div class="h-full w-12 border-x-2 border-dashed border-[#30363D] absolute"></div>
+                            </div>
+                            
+                            <!-- Northbound -->
+                            <div class="absolute top-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5">
+                                <span class="text-[10px] text-[#8c909f] font-mono font-bold">NORTH</span>
+                                <div id="sig-NORTHBOUND" class="w-5 h-5 rounded-full bg-[#30363D] border border-[#424754]"></div>
+                            </div>
+                            <!-- Southbound -->
+                            <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5">
+                                <div id="sig-SOUTHBOUND" class="w-5 h-5 rounded-full bg-[#30363D] border border-[#424754]"></div>
+                                <span class="text-[10px] text-[#8c909f] font-mono font-bold">SOUTH</span>
+                            </div>
+                            <!-- Eastbound -->
+                            <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                <div id="sig-EASTBOUND" class="w-5 h-5 rounded-full bg-[#30363D] border border-[#424754]"></div>
+                                <span class="text-[10px] text-[#8c909f] font-mono font-bold">EAST</span>
+                            </div>
+                            <!-- Westbound -->
+                            <div class="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                <span class="text-[10px] text-[#8c909f] font-mono font-bold">WEST</span>
+                                <div id="sig-WESTBOUND" class="w-5 h-5 rounded-full bg-[#30363D] border border-[#424754]"></div>
+                            </div>
+
+                            <!-- Center Hub -->
+                            <div class="w-10 h-10 bg-[#161B22] z-10 border border-[#424754] rounded flex items-center justify-center shadow-lg">
+                                <span id="center-sig-id" class="text-[11px] font-mono font-bold text-white">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- LEVEL 2: Traffic / Approaches Data -->
+                    <div class="flex flex-col gap-3">
+                        <div class="flex justify-between items-end mb-1">
+                            <h3 class="text-[10px] font-bold tracking-widest text-[#8c909f] uppercase flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-[#F59E0B]"></span> Approach Telemetry
+                            </h3>
+                            <span class="text-[9px] font-mono text-[#424754]">PCU / QUEUE / DELAY</span>
+                        </div>
+                        <div id="drawer-approaches" class="flex flex-col gap-2">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- LEVEL 3 & 4: Network Effect & AURA Decision -->
+                    <div class="flex flex-col gap-3">
+                        <h3 class="text-[10px] font-bold tracking-widest text-[#8c909f] uppercase flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-[#8B5CF6]"></span> Why AURA Acted
+                        </h3>
+                        <div class="bg-[#10131a] border border-[#3B82F6]/40 rounded-lg p-4 flex flex-col gap-3 shadow-[0_0_15px_rgba(59,130,246,0.05)]">
+                            <div class="flex justify-between items-center text-xs border-b border-[#30363D] pb-2">
+                                <span class="text-[#8c909f] font-medium">Downstream Saturation</span>
+                                <span id="drawer-backpressure" class="font-mono text-[#F59E0B] font-bold bg-[#F59E0B]/10 px-2 py-0.5 rounded">--</span>
+                            </div>
+                            <div class="text-sm text-white font-medium leading-relaxed flex items-start gap-2 mt-1">
+                                <svg class="mt-0.5 shrink-0 text-[#3B82F6]" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                                <span id="drawer-explanation">Awaiting state data...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- LEVEL 5: Evidence -->
+                    <div class="flex flex-col gap-3 pb-4">
+                        <h3 class="text-[10px] font-bold tracking-widest text-[#8c909f] uppercase flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-[#10B981]"></span> Camera Evidence
+                        </h3>
+                        <div class="bg-[#0B0E14] border border-[#30363D] rounded-lg overflow-hidden">
+                            <div class="bg-[#161B22] p-3 border-b border-[#30363D] flex items-center gap-3">
+                                <svg class="text-[#8c909f]" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12A10 10 0 0 0 15 21.5M22 12A10 10 0 0 0 9 2.5M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                                <span class="text-[11px] text-[#8c909f] font-mono leading-tight">No synchronized camera frame available for this source.</span>
+                            </div>
+                            <div class="p-4 flex flex-col gap-2 text-xs">
+                                <div class="flex justify-between items-center pb-2 border-b border-[#161B22]">
+                                    <span class="text-[#8c909f] font-medium">Source Mode</span> 
+                                    <span id="ev-source" class="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-[#30363D] text-[#e1e2ec]">--</span>
+                                </div>
+                                <div class="flex justify-between items-center pb-2 border-b border-[#161B22]">
+                                    <span class="text-[#8c909f] font-medium">Total Demand</span> 
+                                    <span id="ev-pcu" class="font-mono text-white font-bold">-- PCU</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-[#8c909f] font-medium">Timestamp</span> 
+                                    <span id="ev-timestamp" class="font-mono text-[#8c909f]">--</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Overlay: Control Room Network Insights -->
+            <div id="cr-insights-panel" class="absolute left-6 bottom-6 w-[320px] bg-[#161B22]/95 backdrop-blur-md border border-[#30363D] rounded-lg z-20 flex flex-col shadow-2xl transition-all duration-300">
+                <div class="p-3 border-b border-[#30363D] flex justify-between items-center cursor-pointer hover:bg-[#30363D]/30 transition-colors rounded-t-lg" id="btn-toggle-insights">
+                    <h3 class="text-[11px] font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                        Network Insights
+                    </h3>
+                    <span id="cr-insights-icon" class="text-[#8c909f] text-[10px]">▼</span>
+                </div>
+                <div id="insights-content" class="p-4 flex flex-col gap-4">
+                    <div class="text-[10px] font-bold tracking-widest text-[#8c909f] uppercase mb-1">Green Wave Offsets</div>
+                    <div class="grid grid-cols-2 gap-3" id="green-wave-grid">
+                        <!-- JS populated -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Overlay: User View Panel -->
+            <div id="panel-user-view" class="absolute left-6 top-6 bottom-6 w-[400px] bg-[#161B22]/95 backdrop-blur-md border border-[#30363D] rounded-lg z-40 shadow-2xl flex flex-col hidden overflow-hidden transition-all">
+                <div class="p-5 border-b border-[#30363D] bg-[#0B0E14]/50">
+                    <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+                        Where are you going?
+                    </h2>
+                </div>
+                
+                <div class="p-5 flex flex-col gap-4 shrink-0 bg-[#161B22]">
+                    <div class="flex items-center gap-4 relative">
+                        <!-- Connecting line visual -->
+                        <div class="absolute left-[27px] top-7 bottom-7 w-0.5 border-l-2 border-dashed border-[#424754]"></div>
+                        
+                        <div class="text-[10px] font-bold text-[#8c909f] w-12 text-right uppercase tracking-widest">From</div>
+                        <select id="user-origin" class="flex-1 bg-[#0B0E14] border border-[#30363D] rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-[#3B82F6] shadow-inner transition-colors">
+                        </select>
+                    </div>
+                    
+                    <div class="flex items-center gap-4">
+                        <div class="text-[10px] font-bold text-[#8c909f] w-12 text-right uppercase tracking-widest">To</div>
+                        <select id="user-destination" class="flex-1 bg-[#0B0E14] border border-[#30363D] rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-[#3B82F6] shadow-inner transition-colors">
+                        </select>
+                    </div>
+                    
+                    <button id="btn-user-route" class="mt-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white py-3 rounded-lg font-bold transition-colors shadow-lg flex items-center justify-center gap-2 text-sm tracking-wide">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                        FIND ROUTE
+                    </button>
+                </div>
+
+                <div id="user-route-results" class="flex-1 overflow-y-auto p-5 pt-2 flex flex-col gap-5 custom-scrollbar bg-[#0B0E14]/30 hidden">
+                    
+                    <!-- AURA Cooperative Route (Recommended) -->
+                    <div class="border border-[#10B981] bg-[#10B981]/10 rounded-lg p-4 flex flex-col gap-3 relative shadow-[0_0_20px_rgba(16,185,129,0.08)]">
+                        <div class="absolute top-0 left-0 bottom-0 w-1.5 bg-[#10B981] rounded-l-lg shadow-[0_0_8px_#10B981]"></div>
+                        <div class="pl-2">
+                            <div class="text-[10px] font-bold tracking-widest text-[#10B981] uppercase flex items-center gap-1.5 mb-1">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                AURA Recommendation
+                            </div>
+                            <div class="flex items-baseline justify-between mb-2">
+                                <div class="text-2xl font-bold text-white tracking-tight" id="aura-time">-- min</div>
+                                <div class="text-[11px] font-mono font-bold text-[#10B981] bg-[#10B981]/20 px-2 py-0.5 rounded border border-[#10B981]/30" id="aura-diff">COOPERATIVE</div>
+                            </div>
+                            <div class="text-[11px] text-[#8c909f] font-mono font-medium flex items-center gap-2 mb-3" id="aura-path">
+                                --
+                            </div>
+                            
+                            <div class="p-3 bg-[#0B0E14] border border-[#30363D] rounded-md text-xs text-[#e1e2ec] leading-relaxed">
+                                <span class="text-[#10B981] font-semibold block mb-1">Why this route?</span>
+                                <span id="aura-explanation">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Individual Fastest Route -->
+                    <div class="border border-[#30363D] bg-[#161B22] rounded-lg p-4 flex flex-col gap-2">
+                        <div class="text-[10px] font-bold tracking-widest text-[#8c909f] uppercase mb-1">Individual Fastest</div>
+                        <div class="flex justify-between items-baseline">
+                            <div class="text-xl font-bold text-white" id="fast-time">-- min</div>
+                            <div class="text-[10px] font-mono font-bold text-[#F59E0B] bg-[#F59E0B]/20 px-2 py-0.5 rounded border border-[#F59E0B]/30" id="fast-diff">--</div>
+                        </div>
+                        <div class="text-[11px] text-[#8c909f] font-mono mt-1" id="fast-path">--</div>
+                        <div class="text-[11px] text-[#8c909f] mt-2 leading-relaxed" id="fast-explanation">--</div>
+                    </div>
+                    
+                </div>
+            </div>
+
+        </div>
+    </main>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="app.js"></script>
-</body></html>
+</body>
+</html>
