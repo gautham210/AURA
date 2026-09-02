@@ -7,6 +7,7 @@ const cors = require('cors');
 const { SimulationSensor, HybridSensor } = require('./trafficSensors');
 const { TrafficEngine, BaselineController } = require('./trafficEngine');
 const { RoutingEngine } = require('./routingEngine');
+const { DemoTrafficController } = require('./demoTrafficController');
 
 const app = express();
 app.use(cors());
@@ -37,6 +38,7 @@ const baseline = new BaselineController(engineConfig);
 const routingEngine = new RoutingEngine(graph);
 
 let latestNetworkState = [];
+const demoController = new DemoTrafficController(aura, graph);
 
 junctionIds.forEach(jid => {
     aura.initJunction(jid, phases);
@@ -51,6 +53,19 @@ app.post('/vision-update', (req, res) => {
 });
 
 let connectedClients = new Set();
+demoController.onEmergencyUpdate = (state) => {
+    const message = JSON.stringify({
+        event: "EMERGENCY_UPDATE",
+        timestamp: new Date().toISOString(),
+        data: state
+    });
+    for (const client of connectedClients) {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+        }
+    }
+};
+
 
 const CYCLE_LENGTH = 60;
 const PROGRESSION_SPEED = 10; // m/s
@@ -91,6 +106,12 @@ wss.on('connection', (ws) => {
                         data: routeResult
                     }));
                 }
+            } else if (payload.event === "START_DEMO") {
+                demoController.start();
+            } else if (payload.event === "PAUSE_DEMO") {
+                demoController.pause();
+            } else if (payload.event === "RESET_DEMO") {
+                demoController.reset();
             }
         } catch (e) {
             console.error("WS error", e);
@@ -115,24 +136,40 @@ setInterval(() => {
     sensor.tick(junctionIds, approaches);
     tickCounter++;
 
+    let demoArrivals = null;
+    if (demoController.active) {
+        demoArrivals = demoController.getSimulatedArrivals();
+    }
+
     junctionIds.forEach(jid => {
         let arrivals = {};
         let sourceModes = {};
-        approaches.forEach(appr => {
-            const state = sensor.getApproachState(jid, appr);
-            arrivals[appr] = { counts: state.counts };
-            sourceModes[appr] = state.sourceMode;
-        });
+        
+        if (demoController.active) {
+            approaches.forEach(appr => {
+                const count = (demoArrivals[jid] && demoArrivals[jid][appr]) ? demoArrivals[jid][appr].counts.car : 0;
+                arrivals[appr] = { counts: { car: count } };
+                sourceModes[appr] = "SIMULATED";
+            });
+        } else {
+            approaches.forEach(appr => {
+                const state = sensor.getApproachState(jid, appr);
+                arrivals[appr] = { counts: state.counts };
+                sourceModes[appr] = state.sourceMode;
+            });
+        }
 
         // Mock downstream utilization to test spillback counting over time
-        const util = 0.5 + 0.5 * Math.sin(tickCounter * 0.1); // oscillates between 0 and 1
+        const util = 0.5 + 0.5 * Math.sin(tickCounter * 0.1); 
         aura.updateBackPressure(jid, util); 
 
         aura.tick(jid, arrivals);
         baseline.tick(jid, arrivals);
 
         Object.keys(sourceModes).forEach(appr => {
-            aura.state[jid].approaches[appr].source_mode = sourceModes[appr];
+            if (aura.state[jid] && aura.state[jid].approaches[appr]) {
+                aura.state[jid].approaches[appr].source_mode = sourceModes[appr];
+            }
         });
     });
 

@@ -132,35 +132,53 @@ class RoutingEngine {
     }
 
     calculateCosts(networkState, edge, isAuraCooperative) {
-        const travel_time = edge.distance / this.nominal_speed;
+        // Road-class aware speeds
+        let speed = 5.5; // Default ~20 km/h (local/connector)
         
-        // Find utilization if target is a controlled junction (match ID or osmNodeId)
+        // If we had OSM tags we'd use them, but we will guess based on name or fallback
+        if (edge.name) {
+            const nameLower = edge.name.toLowerCase();
+            if (nameLower.includes('nh') || nameLower.includes('bypass') || nameLower.includes('national')) {
+                speed = 8.3; // Major arterial ~30 km/h
+            } else if (nameLower.includes('road') || nameLower.includes('banerji') || nameLower.includes('mahatma')) {
+                speed = 7.5; // Urban arterial ~25-30 km/h
+            }
+        }
+        
+        let travel_time = edge.distance / speed;
+        let signal_delay = 0;
+        let congestion_delay = 0;
+        let explanation = '';
+        
         const cj = this.graph.controlledJunctions.find(j => j.id === edge.to || j.osmNodeId === edge.to);
         const targetJunction = cj ? networkState.find(j => j.junction_id === cj.id) : networkState.find(j => j.junction_id === edge.to);
         
-        let utilization = 0;
         let queue_pcu = 0;
+        let utilization = 0;
 
-        if (targetJunction && targetJunction.aura) {
-            const approachState = targetJunction.aura.approaches[edge.approachAtTarget] || 
-                                  Object.values(targetJunction.aura.approaches)[0];
-            if (approachState) {
-                queue_pcu = approachState.queue_pcu || 0;
-                // Assuming 50 PCU is full saturation for demo routing
-                utilization = Math.min(1.0, queue_pcu / 50.0);
+        if (targetJunction) {
+            // Signal delay just for passing a controlled intersection
+            signal_delay = 15; 
+            
+            if (targetJunction.aura) {
+                const approachState = targetJunction.aura.approaches[edge.approachAtTarget] || 
+                                      Object.values(targetJunction.aura.approaches)[0];
+                if (approachState) {
+                    queue_pcu = approachState.queue_pcu || 0;
+                    // Congestion delay: ~2s added delay per PCU in queue ahead
+                    congestion_delay = queue_pcu * 2.0; 
+                    utilization = Math.min(1.0, queue_pcu / 50.0);
+                }
             }
         }
 
-        // Individual congestion factor applies at controlled junctions
-        const individual_factor = 1.0 + (utilization * 1.0);
-        let cost = travel_time * individual_factor;
-        let explanation = '';
+        let cost = travel_time + signal_delay + congestion_delay;
 
         if (isAuraCooperative && targetJunction) {
-            // Marginal penalty: heavily penalize routes > 70% saturated
+            // AURA Penalty: heavily penalize routes > 70% saturated to force alternative routing
             let marginal_penalty = 0;
             if (utilization > 0.7) {
-                marginal_penalty = travel_time * 5.0; // 5x penalty
+                marginal_penalty = travel_time * 5.0; // Huge penalty
                 explanation = `Route avoids ${cj ? cj.name : edge.to} due to high saturation (${Math.round(utilization*100)}%)`;
             } else if (utilization > 0.4) {
                 marginal_penalty = travel_time * 1.5;
@@ -168,7 +186,7 @@ class RoutingEngine {
             cost += marginal_penalty;
         }
 
-        return { cost, utilization, explanation };
+        return { cost, utilization, explanation, travel_time, signal_delay, congestion_delay, queue_pcu };
     }
 
     dijkstra(originId, destId, networkState, isAuraCooperative) {
@@ -218,16 +236,30 @@ class RoutingEngine {
         let finalExplanation = "Fastest available route based on current state.";
         let highestUtil = 0;
         let bottleneckNode = null;
+        
+        let totalBaseTime = 0;
+        let totalSignalDelay = 0;
+        let totalCongestionDelay = 0;
+        let totalAuraPenalty = 0;
 
         for (let i = 0; i < path.length - 1; i++) {
             const neighbors = this.adj[path[i]] || [];
             const e = neighbors.find(edge => edge.to === path[i+1]);
             if (e) {
                 totalDistance += e.distance;
-                const stats = this.calculateCosts(networkState, e, false);
+                const stats = this.calculateCosts(networkState, e, isAuraCooperative);
                 if (stats.utilization > highestUtil) {
                     highestUtil = stats.utilization;
                     bottleneckNode = e.to;
+                }
+                
+                totalBaseTime += stats.travel_time;
+                totalSignalDelay += stats.signal_delay;
+                totalCongestionDelay += stats.congestion_delay;
+                
+                const pureCost = stats.travel_time + stats.signal_delay + stats.congestion_delay;
+                if (stats.cost > pureCost) {
+                    totalAuraPenalty += (stats.cost - pureCost);
                 }
             }
             if (explanations[path[i+1]]) {
@@ -239,6 +271,10 @@ class RoutingEngine {
             route: path,
             distance: totalDistance,
             estimatedTime: dist[destId],
+            baseTravelTime: totalBaseTime,
+            signalDelay: totalSignalDelay,
+            congestionDelay: totalCongestionDelay,
+            auraPenalty: totalAuraPenalty,
             congestionExposure: highestUtil,
             explanation: finalExplanation,
             bottleneckNode: bottleneckNode

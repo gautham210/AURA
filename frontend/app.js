@@ -18,29 +18,13 @@ class AuraStateStore {
         this.graph = graphData;
         initMap(this.graph);
         populateRoutingSelects(this.graph);
-        initTrafficParticleEngine();
+        
     }
 
     updateTrafficState(stateData) {
         this.networkState = stateData.junctions;
         this.greenWave = stateData.green_wave || {};
         
-        // Apply active emergency preemption overrides if active
-        if (this.emergencyActive && Object.keys(this.emergencyPreemptions).length > 0) {
-            this.networkState.forEach(j => {
-                if (this.emergencyPreemptions[j.junction_id]) {
-                    const dir = this.emergencyPreemptions[j.junction_id];
-                    Object.keys(j.aura.approaches).forEach(d => {
-                        if (d === dir) {
-                            j.aura.approaches[d].signal_state = "GREEN";
-                        } else {
-                            j.aura.approaches[d].signal_state = "RED";
-                        }
-                    });
-                }
-            });
-        }
-
         updateTopMetrics(this.networkState);
         updateMapMarkers(this.networkState);
         updateGreenWavePanel(this.greenWave);
@@ -67,7 +51,7 @@ const tabUserView = document.getElementById('tab-user-view');
 const drawerControl = document.getElementById('drawer-control');
 const panelUserView = document.getElementById('panel-user-view');
 const btnCloseDrawer = document.getElementById('btn-close-drawer');
-const btnSimulateEmergency = document.getElementById('btn-simulate-emergency');
+
 const emergencyHud = document.getElementById('emergency-hud');
 const dataSourceLabel = document.getElementById('data-source');
 const connectionStatus = document.getElementById('connection-status');
@@ -92,7 +76,7 @@ function switchMode(mode) {
         panelUserView.classList.add('hidden');
         crInsightsPanel.classList.remove('hidden');
         document.getElementById('top-metrics').classList.remove('hidden');
-        btnSimulateEmergency.classList.remove('hidden');
+        
         
         // Show Control Room Layers
         if (corridorLayer && !map.hasLayer(corridorLayer)) map.addLayer(corridorLayer);
@@ -114,7 +98,7 @@ function switchMode(mode) {
         panelUserView.classList.remove('hidden');
         crInsightsPanel.classList.add('hidden');
         document.getElementById('top-metrics').classList.add('hidden');
-        btnSimulateEmergency.classList.add('hidden');
+        
         drawerControl.classList.add('translate-x-full');
         highlightMarker(null);
         
@@ -283,15 +267,12 @@ function drawControlledJunctions(junctions) {
 }
 
 // -------------------------------------------------------------
-// Real White Traffic Flow Particle Engine (Canvas-based)
+// Authoritative Traffic Visualization (Canvas)
 // -------------------------------------------------------------
 let canvas, ctx;
-let trafficStreams = [];
-
-function initTrafficParticleEngine() {
+function initTrafficVisualization() {
     canvas = document.getElementById('traffic-canvas');
     if (!canvas || !map || !store.graph) return;
-    
     ctx = canvas.getContext('2d');
     
     function resizeCanvas() {
@@ -304,114 +285,67 @@ function initTrafficParticleEngine() {
     map.on('resize', resizeCanvas);
     map.on('move', () => {});
     resizeCanvas();
+    
+    requestAnimationFrame(renderTrafficVis);
+}
 
-    // Build incoming approach road geometries for J1–J6
-    trafficStreams = [];
-    store.graph.controlledJunctions.forEach(j => {
+function renderTrafficVis() {
+    if (!canvas || !ctx || !map || store.currentMode !== 'CONTROL_ROOM') {
+        if(canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        requestAnimationFrame(renderTrafficVis);
+        return;
+    }
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    store.networkState.forEach(jState => {
         const dirs = ["NORTHBOUND", "SOUTHBOUND", "EASTBOUND", "WESTBOUND"];
         dirs.forEach(dir => {
-            const edge = store.graph.edges.find(e => 
-                (e.to === j.osmNodeId || e.to === j.id) && 
-                e.approachAtTarget === dir && 
-                e.geometry && e.geometry.length >= 2
-            );
-            if (edge) {
-                // Initialize particle stream along this physical road segment
-                const particles = [];
-                for (let i = 0; i < 8; i++) {
-                    particles.push({
-                        progress: Math.random(), // 0 = start of edge, 1 = junction stop line
-                        speed: 0.003 + Math.random() * 0.003,
-                        laneOffset: (Math.random() - 0.5) * 0.00004
-                    });
-                }
-                trafficStreams.push({
-                    junctionId: j.id,
-                    approach: dir,
-                    geometry: edge.geometry,
-                    particles: particles
-                });
+            const app = jState.aura.approaches[dir];
+            if (!app) return;
+            
+            // Find edge geometry
+            const edge = store.graph.edges.find(e => (e.to === jState.junction_id || e.to === store.graph.controlledJunctions.find(j=>j.id===jState.junction_id)?.osmNodeId) && e.approachAtTarget === dir && e.geometry);
+            if (!edge) return;
+            
+            const geom = edge.geometry;
+            if (geom.length < 2) return;
+            
+            // We draw vehicles based on queue_pcu
+            const pcu = Math.min(app.queue_pcu || 0, 50); // cap at 50 for visual sanity
+            if (pcu <= 0) return;
+            
+            const numVehicles = Math.ceil(pcu);
+            const isGreen = app.signal_state === "GREEN";
+            
+            ctx.fillStyle = isGreen ? "rgba(16, 185, 129, 0.8)" : "rgba(239, 68, 68, 0.8)"; // Green or Red vehicles
+            
+            // Start from junction (end of edge) and work backwards
+            let geomIdx = geom.length - 1;
+            let currentPt = geom[geomIdx];
+            let prevPt = geom[geomIdx - 1];
+            
+            for(let i=0; i<numVehicles; i++) {
+                // Approximate mapping: each vehicle takes up space backwards along the segment
+                const offsetProgress = Math.max(0, 1.0 - ((i+1) * 0.02)); 
+                // Project onto screen
+                const p1Pos = map.latLngToContainerPoint([prevPt[0], prevPt[1]]);
+                const p2Pos = map.latLngToContainerPoint([currentPt[0], currentPt[1]]);
+                
+                const vx = p2Pos.x - p1Pos.x;
+                const vy = p2Pos.y - p1Pos.y;
+                
+                const px = p1Pos.x + vx * offsetProgress;
+                const py = p1Pos.y + vy * offsetProgress;
+                
+                ctx.beginPath();
+                ctx.arc(px, py, 1.5, 0, 2 * Math.PI);
+                ctx.fill();
             }
         });
     });
-
-    requestAnimationFrame(renderTrafficParticles);
-}
-
-function renderTrafficParticles() {
-    if (!canvas || !ctx || !map) {
-        requestAnimationFrame(renderTrafficParticles);
-        return;
-    }
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Only render particles in Control Room
-    if (store.currentMode === 'CONTROL_ROOM') {
-        trafficStreams.forEach(stream => {
-            const jState = store.networkState.find(s => s.junction_id === stream.junctionId);
-            let appState = null;
-            if (jState && jState.aura && jState.aura.approaches) {
-                appState = jState.aura.approaches[stream.approach];
-            }
-
-            const isGreen = appState ? (appState.signal_state === "GREEN") : true;
-            const q = appState ? (appState.queue_pcu || 0) : 5;
-            
-            // Queue stop boundary: higher queue = longer packed queue line
-            const queueStopProgress = Math.max(0.2, 0.95 - (q / 60.0) * 0.6);
-
-            stream.particles.forEach(p => {
-                if (isGreen) {
-                    // Moving smoothly through intersection
-                    p.progress += p.speed;
-                    if (p.progress > 1.0) p.progress = 0;
-                } else {
-                    // Red signal: decelerate and queue up behind stop line
-                    if (p.progress < queueStopProgress) {
-                        p.progress += p.speed * 0.7;
-                    } else if (p.progress < 0.96) {
-                        p.progress += p.speed * 0.15; // Slow crawl in queue
-                    } else {
-                        // Stopped
-                    }
-                }
-
-                // Interpolate along the road geometry
-                const pt = interpolatePolyline(stream.geometry, p.progress);
-                if (pt) {
-                    const screenPt = map.latLngToContainerPoint([pt[0] + p.laneOffset, pt[1] + p.laneOffset]);
-                    
-                    // Draw glowing white traffic particle
-                    ctx.beginPath();
-                    ctx.arc(screenPt.x, screenPt.y, 2.0, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
-                    ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
-                    ctx.shadowBlur = 3;
-                    ctx.fill();
-                }
-            });
-        });
-    }
-
-    requestAnimationFrame(renderTrafficParticles);
-}
-
-function interpolatePolyline(geom, t) {
-    if (!geom || geom.length < 2) return null;
-    t = Math.max(0, Math.min(1, t));
     
-    const numSegments = geom.length - 1;
-    const segIndex = Math.min(Math.floor(t * numSegments), numSegments - 1);
-    const segT = (t * numSegments) - segIndex;
-
-    const [lat1, lng1] = geom[segIndex];
-    const [lat2, lng2] = geom[segIndex + 1];
-
-    return [
-        lat1 + (lat2 - lat1) * segT,
-        lng1 + (lng2 - lng1) * segT
-    ];
+    requestAnimationFrame(renderTrafficVis);
 }
 
 // -------------------------------------------------------------
@@ -625,7 +559,7 @@ function generateAuraExplanation(jState) {
         }
     });
 
-    if (store.emergencyPreemptions[jState.junction_id]) {
+    if (false) {
         return `🚨 EMERGENCY VEHICLE CLEARING CORRIDOR. Absolute priority green granted for emergency transit.`;
     } else if (bp < 0.8) {
         return `Downstream saturation detected along arterial corridor. Applied backpressure penalty (x${bp.toFixed(2)}) to meter incoming traffic and prevent spillback.`;
@@ -1173,3 +1107,37 @@ ws.onmessage = (evt) => {
         console.error("WebSocket payload error", e);
     }
 };
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Inject Demo Controls into Control Room Header
+    const crHeader = document.querySelector('.bg-\[\#0d1117\].border-b.border-\[\#30363d\].px-6.py-4 .flex.items-center.gap-6');
+    if (crHeader) {
+        const demoControls = document.createElement('div');
+        demoControls.className = "flex items-center gap-2 ml-auto";
+        demoControls.innerHTML = `
+            <button id="btn-demo-start" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold rounded shadow transition-colors">START DEMO</button>
+            <button id="btn-demo-pause" class="px-3 py-1 bg-yellow-600 hover:bg-yellow-500 text-white font-mono text-xs font-bold rounded shadow transition-colors hidden">PAUSE</button>
+            <button id="btn-demo-reset" class="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white font-mono text-xs font-bold rounded shadow transition-colors">RESET</button>
+        `;
+        crHeader.appendChild(demoControls);
+        
+        document.getElementById('btn-demo-start').addEventListener('click', (e) => {
+            ws.send(JSON.stringify({ event: 'START_DEMO' }));
+            e.target.classList.add('hidden');
+            document.getElementById('btn-demo-pause').classList.remove('hidden');
+        });
+        
+        document.getElementById('btn-demo-pause').addEventListener('click', (e) => {
+            ws.send(JSON.stringify({ event: 'PAUSE_DEMO' }));
+            e.target.classList.add('hidden');
+            document.getElementById('btn-demo-start').classList.remove('hidden');
+        });
+        
+        document.getElementById('btn-demo-reset').addEventListener('click', () => {
+            ws.send(JSON.stringify({ event: 'RESET_DEMO' }));
+            document.getElementById('btn-demo-pause').classList.add('hidden');
+            document.getElementById('btn-demo-start').classList.remove('hidden');
+        });
+    }
+});

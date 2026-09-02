@@ -34,7 +34,13 @@ class TrafficEngine {
             downstreamUtilization: 0, // Mocked or calculated externally if full network
             backPressureMultiplier: 1.0,
             backPressureLevel: 0, 
-            spillbackEvents: 0
+            spillbackEvents: 0,
+            emergency: {
+                active: false,
+                approach: null,
+                state: 'NORMAL',
+                timer: 0
+            }
         };
 
         for (const phaseApproaches of phases) {
@@ -89,6 +95,31 @@ class TrafficEngine {
         }
         junction.backPressureLevel = newLevel;
         junction.backPressureMultiplier = this.getBackPressureMultiplier(downstreamUtilization);
+    }
+
+    setEmergencyPreemption(junctionId, approach) {
+        const junction = this.state[junctionId];
+        if (!junction) return;
+
+        if (approach) {
+            // Activate: CLEARING for 3 ticks, then tick() transitions to EMERGENCY_GREEN
+            junction.emergency.active = true;
+            junction.emergency.approach = approach;
+            junction.emergency.state = 'CLEARING';
+            junction.emergency.timer = 3;
+        } else {
+            // Deactivate: RECOVERY for 3 ticks, then tick() transitions to NORMAL
+            if (junction.emergency.active) {
+                junction.emergency.state = 'RECOVERY';
+                junction.emergency.timer = 3;
+            } else {
+                // Already inactive, ensure clean state
+                junction.emergency.active = false;
+                junction.emergency.approach = null;
+                junction.emergency.state = 'NORMAL';
+                junction.emergency.timer = 0;
+            }
+        }
     }
 
     allocateGreens(junctionId, demandPCU) {
@@ -154,30 +185,59 @@ class TrafficEngine {
             }
         }
 
-        if (gapOutTriggered || junction.phaseTimeRemaining <= 0) {
-            // Next phase
-            junction.currentPhaseIndex = (junction.currentPhaseIndex + 1) % junction.phases.length;
-            if (junction.currentPhaseIndex === 0) {
-                // Reallocate greens based on current queue + recent arrivals (mocking actual demand info here)
-                let demandPCU = {};
+        // --- Emergency Override Logic ---
+        if (junction.emergency.active) {
+            if (junction.emergency.state === 'CLEARING') {
+                for (let i = 0; i < junction.phases.length; i++) {
+                    for (const app of junction.phases[i]) junction.approaches[app].signalState = "RED"; // (Could be AMBER conceptually)
+                }
+                junction.emergency.timer--;
+                if (junction.emergency.timer <= 0) {
+                    junction.emergency.state = 'EMERGENCY_GREEN';
+                }
+            } else if (junction.emergency.state === 'EMERGENCY_GREEN') {
                 for (let i = 0; i < junction.phases.length; i++) {
                     for (const app of junction.phases[i]) {
-                        demandPCU[app] = junction.approaches[app].q;
+                        junction.approaches[app].signalState = (app === junction.emergency.approach) ? "GREEN" : "RED";
                     }
                 }
-                this.allocateGreens(junctionId, demandPCU);
-            } else {
-                junction.phaseTimeRemaining = junction.phaseDurations[junction.currentPhaseIndex];
+            } else if (junction.emergency.state === 'RECOVERY') {
+                for (let i = 0; i < junction.phases.length; i++) {
+                    for (const app of junction.phases[i]) junction.approaches[app].signalState = "RED";
+                }
+                junction.emergency.timer--;
+                if (junction.emergency.timer <= 0) {
+                    junction.emergency.active = false;
+                    junction.emergency.state = 'NORMAL';
+                }
             }
         } else {
-            junction.phaseTimeRemaining -= 1;
-        }
+            // --- Normal Signal Logic ---
+            if (gapOutTriggered || junction.phaseTimeRemaining <= 0) {
+                // Next phase
+                junction.currentPhaseIndex = (junction.currentPhaseIndex + 1) % junction.phases.length;
+                if (junction.currentPhaseIndex === 0) {
+                    // Reallocate greens based on current queue + recent arrivals (mocking actual demand info here)
+                    let demandPCU = {};
+                    for (let i = 0; i < junction.phases.length; i++) {
+                        for (const app of junction.phases[i]) {
+                            demandPCU[app] = junction.approaches[app].q;
+                        }
+                    }
+                    this.allocateGreens(junctionId, demandPCU);
+                } else {
+                    junction.phaseTimeRemaining = junction.phaseDurations[junction.currentPhaseIndex];
+                }
+            } else {
+                junction.phaseTimeRemaining -= 1;
+            }
 
-        // Update signals based on phase
-        for (let i = 0; i < junction.phases.length; i++) {
-            const isGreen = (i === junction.currentPhaseIndex);
-            for (const app of junction.phases[i]) {
-                junction.approaches[app].signalState = isGreen ? "GREEN" : "RED";
+            // Update signals based on phase
+            for (let i = 0; i < junction.phases.length; i++) {
+                const isGreen = (i === junction.currentPhaseIndex);
+                for (const app of junction.phases[i]) {
+                    junction.approaches[app].signalState = isGreen ? "GREEN" : "RED";
+                }
             }
         }
 
@@ -336,6 +396,28 @@ class BaselineController {
             }
         }
         return state;
+    }
+
+    setEmergencyPreemption(junctionId, approach) {
+        if (!this.state[junctionId]) return;
+        const junction = this.state[junctionId];
+        
+        if (approach) {
+            if (junction.emergency.approach !== approach) {
+                junction.emergency.active = true;
+                junction.emergency.approach = approach;
+                if (junction.emergency.state === 'NORMAL' || junction.emergency.state === 'RECOVERY') {
+                    junction.emergency.state = 'CLEARING';
+                    junction.emergency.timer = 3;
+                }
+            }
+        } else {
+            if (junction.emergency.active) {
+                junction.emergency.state = 'RECOVERY';
+                junction.emergency.timer = 2;
+                junction.emergency.approach = null;
+            }
+        }
     }
 }
 
