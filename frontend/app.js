@@ -889,7 +889,12 @@ function interpolatePolyline(coords, progress) {
 if (btnSimulateEmergency) {
     btnSimulateEmergency.addEventListener('click', () => {
         if (store.emergencyActive) return;
-        ws.send(JSON.stringify({ event: "TRIGGER_EMERGENCY" }));
+        const scenarioSelect = document.getElementById('select-emergency-scenario');
+        const scenario = scenarioSelect ? scenarioSelect.value : 'HEAVY_CONGESTION';
+        // Hide any previous results
+        const resultsPanel = document.getElementById('emergency-results');
+        if (resultsPanel) resultsPanel.classList.add('hidden');
+        ws.send(JSON.stringify({ event: "TRIGGER_EMERGENCY", scenario: scenario }));
         btnSimulateEmergency.disabled = true;
         btnSimulateEmergency.classList.add('opacity-50', 'cursor-not-allowed');
         
@@ -983,10 +988,6 @@ function handleEmergencyUpdate(data) {
         // Emergency ended
         store.emergencyActive = false;
         if (emergencyHud) emergencyHud.classList.add('hidden');
-        if (emergencyLayer) emergencyLayer.clearLayers();
-        emergencyMarker = null;
-        emergencyPolyline = null;
-        emergencyGlowPolyline = null;
 
         const destEl = document.getElementById('hud-dest-hospital');
         const etaEl = document.getElementById('hud-eta');
@@ -995,11 +996,53 @@ function handleEmergencyUpdate(data) {
         if (etaEl) etaEl.textContent = "--s";
         if (statusEl) statusEl.textContent = "CLEARING CORRIDOR...";
 
+        // Show completion results if available
+        if (data.completed && data.completionMetrics) {
+            renderEmergencyResults(data.completionMetrics);
+        }
+
         if (btnSimulateEmergency) {
             btnSimulateEmergency.disabled = false;
             btnSimulateEmergency.classList.remove('opacity-50', 'cursor-not-allowed');
         }
     }
+}
+
+function renderEmergencyResults(m) {
+    if (!m) return;
+    const panel = document.getElementById('emergency-results');
+    if (!panel) return;
+
+    const pctBadge = document.getElementById('em-pct-badge');
+    const auraTime = document.getElementById('em-aura-time');
+    const baseTime = document.getElementById('em-base-time');
+    const auraSig = document.getElementById('em-aura-sig');
+    const baseSig = document.getElementById('em-base-sig');
+    const auraQ = document.getElementById('em-aura-q');
+    const baseQ = document.getElementById('em-base-q');
+    const routeInfo = document.getElementById('em-route-info');
+    const distInfo = document.getElementById('em-dist-info');
+
+    if (pctBadge) pctBadge.textContent = `${m.percentageSaved}% TIME SAVED`;
+    if (auraTime) auraTime.textContent = m.auraTravelTimeFormatted;
+    if (baseTime) baseTime.textContent = m.baselineTravelTimeFormatted;
+    if (auraSig) auraSig.textContent = `${m.auraSignalDelaySeconds}s`;
+    if (baseSig) baseSig.textContent = `${m.baselineSignalDelaySeconds}s`;
+    if (auraQ) auraQ.textContent = `${m.auraQueueDelaySeconds}s`;
+    if (baseQ) baseQ.textContent = `${m.baselineQueueDelaySeconds}s`;
+    if (routeInfo) routeInfo.textContent = m.routePath;
+    if (distInfo) distInfo.textContent = `${m.distanceKm} km`;
+
+    panel.classList.remove('hidden');
+}
+
+// Dismiss emergency results
+const btnDismissResults = document.getElementById('btn-dismiss-results');
+if (btnDismissResults) {
+    btnDismissResults.addEventListener('click', () => {
+        const panel = document.getElementById('emergency-results');
+        if (panel) panel.classList.add('hidden');
+    });
 }
 
 // -------------------------------------------------------------

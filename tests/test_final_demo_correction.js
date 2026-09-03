@@ -33,17 +33,17 @@ assert.strictEqual(demoController.currentPhase, "TRAFFIC BUILDUP");
 console.log("✓ TEST 1 PASSED: Demo starts cleanly from t=0.");
 
 // -------------------------------------------------------------
-// TEST 2: Demo completes <= 15 real/demo seconds
+// TEST 2: Demo completes in 10 seconds
 // -------------------------------------------------------------
-console.log("\n[TEST 2] Demo completes <= 15 real/demo seconds...");
-for (let t = 0; t < 15; t++) {
+console.log("\n[TEST 2] Demo completes in 10 seconds...");
+for (let t = 0; t < 10; t++) {
     demoController.tick();
 }
-assert.strictEqual(demoController.completed, true, "Demo must be marked completed at t=15");
+assert.strictEqual(demoController.completed, true, "Demo must be marked completed at t=10");
 assert.strictEqual(demoController.active, false, "Demo must become inactive upon completion");
-assert.strictEqual(demoController.elapsedSeconds, 15, "Demo must complete in exactly 15 seconds");
+assert.strictEqual(demoController.elapsedSeconds, 10, "Demo must complete in exactly 10 seconds");
 assert.strictEqual(demoController.currentPhase, "DEMO COMPLETE");
-console.log("✓ TEST 2 PASSED: Demo scenario completes in exactly 15 seconds.");
+console.log("✓ TEST 2 PASSED: Demo scenario completes in exactly 10 seconds.");
 
 // -------------------------------------------------------------
 // TEST 3: Demo resets correctly
@@ -54,7 +54,7 @@ assert.strictEqual(demoController.elapsedSeconds, 0, "Reset must zero elapsedSec
 assert.strictEqual(demoController.active, false, "Reset must deactivate demo");
 assert.strictEqual(demoController.completed, false, "Reset must clear completed flag");
 assert.strictEqual(demoController.events.length, 0, "Reset must clear event log");
-assert.strictEqual(demoController.emergency.active, false, "Reset must deactivate emergency");
+assert.strictEqual(demoController.emergency?.active || false, false, "Reset must deactivate emergency");
 graph.controlledJunctions.forEach(j => {
     const s = trafficEngine.getJunctionState(j.id);
     assert.strictEqual(s.emergency.active, false, `Junction ${j.id} emergency must be inactive after reset`);
@@ -88,45 +88,50 @@ console.log(`✓ TEST 5 PASSED: Route traversed ${junctionsPassed.join(' → ')}
 // TEST 6: Sequential preemption occurs (J3 -> J4 -> J5 -> J6)
 // -------------------------------------------------------------
 console.log("\n[TEST 6] Sequential preemption occurs...");
-demoController.start();
+const { EmergencyDemoController } = require('../backend/demoTrafficController');
+const emDemo = new EmergencyDemoController(trafficEngine, graph);
+emDemo.start("NORMAL");
 
 function runTick() {
-    demoController.tick();
+    emDemo.tick();
     graph.controlledJunctions.forEach(j => trafficEngine.tick(j.id, {}));
 }
 
-// Advance to T=6 (J3 should be EMERGENCY_GREEN)
-for (let t = 0; t < 6; t++) runTick();
+// Advance to T=2 (J3 should be EMERGENCY_GREEN after 1 tick clearing)
+runTick(); // T=1
+runTick(); // T=2
 let j3State = trafficEngine.getJunctionState('J3');
 let j4State = trafficEngine.getJunctionState('J4');
-assert.strictEqual(j3State.approaches.NORTHBOUND.signal_state, "GREEN", "J3 NORTHBOUND must be GREEN at T=6");
-assert.notStrictEqual(j4State.emergency.state, "EMERGENCY_GREEN", "J4 must not have emergency green at T=6");
+assert.strictEqual(j3State.approaches.NORTHBOUND.signal_state, "GREEN", "J3 NORTHBOUND must be GREEN at T=2");
+assert.notStrictEqual(j4State.emergency.state, "EMERGENCY_GREEN", "J4 must not have emergency green at T=2");
 
-// Advance to T=7 (J4 should be EMERGENCY_GREEN, J3 cleared)
-runTick(); // T=7
+// Advance to T=4 (J4 should be EMERGENCY_GREEN, J3 cleared)
+runTick(); // T=3
+runTick(); // T=4
 j3State = trafficEngine.getJunctionState('J3');
 j4State = trafficEngine.getJunctionState('J4');
-assert.strictEqual(j4State.approaches.WESTBOUND.signal_state, "GREEN", "J4 WESTBOUND must be GREEN at T=7");
-assert.notStrictEqual(j3State.emergency.state, "EMERGENCY_GREEN", "J3 must no longer have emergency green at T=7");
+assert.strictEqual(j4State.approaches.WESTBOUND.signal_state, "GREEN", "J4 WESTBOUND must be GREEN at T=4");
+assert.notStrictEqual(j3State.emergency.state, "EMERGENCY_GREEN", "J3 must no longer have emergency green at T=4");
 
-// Advance to T=9 (J5 should be EMERGENCY_GREEN, J4 cleared)
-runTick(); // T=8
-runTick(); // T=9
+// Advance to T=6 (J5 should be EMERGENCY_GREEN, J4 cleared)
+runTick(); // T=5
+runTick(); // T=6
 let j5State = trafficEngine.getJunctionState('J5');
 j4State = trafficEngine.getJunctionState('J4');
-assert.strictEqual(j5State.approaches.NORTHBOUND.signal_state, "GREEN", "J5 NORTHBOUND must be GREEN at T=9");
-assert.notStrictEqual(j4State.emergency.state, "EMERGENCY_GREEN", "J4 must no longer have emergency green at T=9");
+assert.strictEqual(j5State.approaches.NORTHBOUND.signal_state, "GREEN", "J5 NORTHBOUND must be GREEN at T=6");
+assert.notStrictEqual(j4State.emergency.state, "EMERGENCY_GREEN", "J4 must no longer have emergency green at T=6");
 
-// Advance to T=11 (J6 should be EMERGENCY_GREEN, J5 cleared)
-runTick(); // T=10
-runTick(); // T=11
+// Advance to T=8 (J6 should be EMERGENCY_GREEN, J5 cleared)
+runTick(); // T=7
+runTick(); // T=8
 let j6State = trafficEngine.getJunctionState('J6');
 j5State = trafficEngine.getJunctionState('J5');
-assert.strictEqual(j6State.approaches.SOUTHBOUND.signal_state, "GREEN", "J6 SOUTHBOUND must be GREEN at T=11");
-assert.notStrictEqual(j5State.emergency.state, "EMERGENCY_GREEN", "J5 must no longer have emergency green at T=11");
+assert.strictEqual(j6State.approaches.SOUTHBOUND.signal_state, "GREEN", "J6 SOUTHBOUND must be GREEN at T=8");
+assert.notStrictEqual(j5State.emergency.state, "EMERGENCY_GREEN", "J5 must no longer have emergency green at T=8");
 
-// Advance to T=12 (All preemption cleared)
-runTick(); // T=12
+// Advance to T=10 (All preemption cleared)
+runTick(); // T=9
+runTick(); // T=10
 j6State = trafficEngine.getJunctionState('J6');
 assert.strictEqual(j6State.emergency.active, false, "J6 emergency preemption must be cleared after emergency passes");
 console.log("✓ TEST 6 PASSED: Sequential preemption verified: J3 -> J4 -> J5 -> J6 with previous junctions returning to normal.");
@@ -140,7 +145,7 @@ graph.controlledJunctions.forEach(j => teCheck.initJunction(j.id, phases));
 const dcCheck = new DemoTrafficController(teCheck, graph);
 dcCheck.start();
 
-for (let t = 0; t < 15; t++) {
+for (let t = 0; t < 10; t++) {
     dcCheck.tick();
     graph.controlledJunctions.forEach(j => {
         const s = teCheck.getJunctionState(j.id);
@@ -159,7 +164,7 @@ for (let t = 0; t < 15; t++) {
         }
     });
 }
-console.log("✓ TEST 7 PASSED: Zero conflicting green movements across all 15 demo seconds.");
+console.log("✓ TEST 7 PASSED: Zero conflicting green movements across all 10 demo seconds.");
 
 // -------------------------------------------------------------
 // TEST 8: Queue remains physically bounded (no runaway > 100 PCU)
@@ -171,7 +176,7 @@ graph.controlledJunctions.forEach(j => teBounded.initJunction(j.id, phases));
 const dcBounded = new DemoTrafficController(teBounded, graph);
 dcBounded.start();
 
-for (let t = 0; t < 15; t++) {
+for (let t = 0; t < 10; t++) {
     const arrivals = dcBounded.getSimulatedArrivals();
     graph.controlledJunctions.forEach(j => {
         teBounded.tick(j.id, arrivals[j.id] || {});

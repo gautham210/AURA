@@ -131,14 +131,55 @@ class TrafficEngine {
         junction.downstreamUtilization = downstreamUtilization;
         const newLevel = this.getBackPressureLevel(downstreamUtilization);
         
-        // Spillback event transition semantics: rising-edge trigger on saturation threshold
-        const isSaturated = (downstreamUtilization >= 0.90);
-        if (!junction.downstreamSpillbackActive && isSaturated) {
+        // Spillback event transition semantics: rising-edge trigger into higher congestion band
+        if (newLevel > junction.backPressureLevel) {
             junction.spillbackEvents += 1;
         }
-        junction.downstreamSpillbackActive = isSaturated;
+        junction.downstreamSpillbackActive = (downstreamUtilization >= 0.90);
         junction.backPressureLevel = newLevel;
         junction.backPressureMultiplier = this.getBackPressureMultiplier(downstreamUtilization);
+    }
+
+    reset(junctionId = null) {
+        const jids = junctionId ? [junctionId] : Object.keys(this.state);
+        for (const jid of jids) {
+            const junction = this.state[jid];
+            if (!junction) continue;
+
+            junction.currentPhaseIndex = 0;
+            junction.phaseTimeRemaining = junction.phaseDurations[0] || 30;
+            junction.downstreamUtilization = 0;
+            junction.downstreamSpillbackActive = false;
+            junction.backPressureMultiplier = 1.0;
+            junction.backPressureLevel = 0;
+            junction.spillbackEvents = 0;
+            junction.emergency = {
+                active: false,
+                approach: null,
+                state: 'NORMAL',
+                timer: 0
+            };
+
+            for (const app of Object.keys(junction.approaches)) {
+                const a = junction.approaches[app];
+                a.q = 0;
+                a.max_q = 0;
+                a.spillbackActive = false;
+                a.spillbackEvents = 0;
+                a.totalAccumulatedDelay = 0;
+                a.totalVehiclesArrived = 0;
+                a.emptySeconds = 0;
+                a.signalState = "RED";
+            }
+
+            this.allocateGreens(jid, {});
+            for (let i = 0; i < junction.phases.length; i++) {
+                const isGreenPhase = (i === junction.currentPhaseIndex);
+                for (const app of junction.phases[i]) {
+                    junction.approaches[app].signalState = isGreenPhase ? "GREEN" : "RED";
+                }
+            }
+        }
     }
 
     setEmergencyPreemption(junctionId, approach, bufferTicks) {
@@ -570,6 +611,34 @@ class BaselineController {
             max_queue_pcu: +(maxQueue.toFixed(1)),
             total_delay_seconds: +(totalDelay.toFixed(1))
         };
+    }
+
+    reset(junctionId = null) {
+        const jids = junctionId ? [junctionId] : Object.keys(this.state);
+        for (const jid of jids) {
+            const junction = this.state[jid];
+            if (!junction) continue;
+
+            junction.currentPhaseIndex = 0;
+            junction.phaseTimeRemaining = this.config.phase1Duration || 30;
+
+            for (const app of Object.keys(junction.approaches)) {
+                const a = junction.approaches[app];
+                a.q = 0;
+                a.max_q = 0;
+                a.totalAccumulatedDelay = 0;
+                a.totalVehiclesArrived = 0;
+                a.signalState = "RED";
+            }
+
+            if (junction.phases && junction.phases[0]) {
+                for (const app of junction.phases[0]) {
+                    if (junction.approaches[app]) {
+                        junction.approaches[app].signalState = "GREEN";
+                    }
+                }
+            }
+        }
     }
 }
 

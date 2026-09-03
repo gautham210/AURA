@@ -146,7 +146,12 @@
                 </button>
             </div>
 
-            <!-- Emergency Preemption Simulation Button -->
+            <!-- Emergency Preemption Simulation -->
+            <select id="select-emergency-scenario" class="bg-[#161b22] text-[#e6edf3] text-[10px] font-mono font-bold px-2 py-1.5 rounded-md border border-[#30363d] focus:border-[#EF4444] outline-none cursor-pointer">
+                <option value="HEAVY_CONGESTION" selected>HEAVY CONGESTION</option>
+                <option value="NORMAL">NORMAL</option>
+                <option value="VERY_HEAVY">VERY HEAVY</option>
+            </select>
             <button id="btn-simulate-emergency" class="px-3 py-1.5 bg-gradient-to-r from-[#DC2626] to-[#EF4444] hover:from-[#B91C1C] hover:to-[#DC2626] text-white text-xs font-bold rounded-md border border-[#F87171]/50 shadow-[0_0_14px_rgba(220,38,38,0.5)] transition-all flex items-center gap-1.5 active:scale-95">
                 <span class="text-sm">🚨</span>
                 <span>SIMULATE EMERGENCY</span>
@@ -249,6 +254,33 @@
                 <div class="flex flex-col">
                     <span class="text-[9px] font-mono text-[#8b949e] uppercase">PREEMPTION STATUS</span>
                     <span id="hud-status" class="text-xs font-mono font-bold text-[#60A5FA]">CLEARING CORRIDOR...</span>
+                </div>
+            </div>
+
+            <!-- Emergency Completion Results Panel (appears when emergency completes) -->
+            <div id="emergency-results" class="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-[#0d1117]/95 backdrop-blur-md border border-[#10B981] rounded-lg px-5 py-4 shadow-[0_0_30px_rgba(16,185,129,0.3)] hidden transition-all max-w-[560px] w-[560px]">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm">🚑</span>
+                        <span class="text-xs font-mono font-extrabold text-[#10B981] tracking-wider uppercase">EMERGENCY PREEMPTION COMPLETE</span>
+                        <span id="em-pct-badge" class="px-2 py-0.5 bg-[#10B981]/20 text-[#10B981] font-mono text-[10px] font-extrabold rounded border border-[#10B981]/40">--% TIME SAVED</span>
+                    </div>
+                    <button id="btn-dismiss-results" class="text-[#8b949e] hover:text-white text-xs font-mono px-2 py-0.5 rounded hover:bg-[#30363d]">✕</button>
+                </div>
+                <div class="grid grid-cols-2 gap-3 font-mono text-xs mb-3">
+                    <div class="bg-[#161b22] border border-[#10B981]/40 rounded-lg p-3">
+                        <div class="text-[9px] font-bold text-[#10B981] uppercase mb-1">AURA Preempted</div>
+                        <div class="text-lg font-black text-[#10B981]" id="em-aura-time">--</div>
+                        <div class="text-[10px] text-[#8b949e] mt-1">Signal: <span id="em-aura-sig" class="text-white">--</span> | Queue: <span id="em-aura-q" class="text-[#10B981]">--</span></div>
+                    </div>
+                    <div class="bg-[#161b22] border border-[#EF4444]/40 rounded-lg p-3">
+                        <div class="text-[9px] font-bold text-[#EF4444] uppercase mb-1">Fixed-Time Baseline</div>
+                        <div class="text-lg font-black text-[#EF4444]" id="em-base-time">--</div>
+                        <div class="text-[10px] text-[#8b949e] mt-1">Signal: <span id="em-base-sig" class="text-white">--</span> | Queue: <span id="em-base-q" class="text-[#EF4444]">--</span></div>
+                    </div>
+                </div>
+                <div class="text-[10px] font-mono text-[#8b949e]">
+                    <span id="em-route-info">--</span> · <span id="em-dist-info">--</span>
                 </div>
             </div>
 

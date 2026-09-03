@@ -39,7 +39,7 @@ const routingEngine = new RoutingEngine(graph);
 
 let latestNetworkState = [];
 const trafficDemoController = new TrafficDemoController(aura, graph);
-const emergencyDemoController = new EmergencyDemoController(aura, graph);
+const emergencyDemoController = new EmergencyDemoController(aura, graph, baseline);
 
 junctionIds.forEach(jid => {
     aura.initJunction(jid, phases);
@@ -133,8 +133,8 @@ function getGreenWaveStates() {
 }
 
 wss.on('connection', (ws) => {
-    console.log("Client connected");
     connectedClients.add(ws);
+    console.log("Client connected. Total:", connectedClients.size);
     
     ws.on('message', (message) => {
         try {
@@ -149,17 +149,24 @@ wss.on('connection', (ws) => {
                     }));
                 }
             } else if (payload.event === "START_DEMO") {
+                aura.reset();
+                baseline.reset();
                 emergencyDemoController.reset();
                 trafficDemoController.start();
             } else if (payload.event === "PAUSE_DEMO") {
                 trafficDemoController.pause();
                 emergencyDemoController.pause();
             } else if (payload.event === "RESET_DEMO") {
+                aura.reset();
+                baseline.reset();
                 trafficDemoController.reset();
                 emergencyDemoController.reset();
             } else if (payload.event === "TRIGGER_EMERGENCY") {
+                aura.reset();
+                baseline.reset();
                 trafficDemoController.reset();
-                emergencyDemoController.start();
+                const scenario = (payload.data && payload.data.scenario) || payload.scenario || "HEAVY_CONGESTION";
+                emergencyDemoController.start(scenario);
             }
         } catch (e) {
             console.error("WS error", e);
@@ -187,16 +194,18 @@ setInterval(() => {
     let demoArrivals = null;
     if (trafficDemoController.active) {
         demoArrivals = trafficDemoController.getSimulatedArrivals();
+    } else if (emergencyDemoController.active) {
+        demoArrivals = emergencyDemoController.getSimulatedArrivals();
     }
 
     junctionIds.forEach(jid => {
         let arrivals = {};
         let sourceModes = {};
         
-        if (trafficDemoController.active) {
+        if (demoArrivals) {
             approaches.forEach(appr => {
-                const count = (demoArrivals[jid] && demoArrivals[jid][appr]) ? demoArrivals[jid][appr].counts.car : 0;
-                arrivals[appr] = { counts: { car: count } };
+                const arr = (demoArrivals[jid] && demoArrivals[jid][appr]) ? demoArrivals[jid][appr] : { counts: { car: 0 } };
+                arrivals[appr] = arr;
                 sourceModes[appr] = "SIMULATED";
             });
         } else {
